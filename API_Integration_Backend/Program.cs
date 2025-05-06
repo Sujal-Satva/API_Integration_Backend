@@ -1,8 +1,14 @@
+using DataAccess.Services;
 using Microsoft.EntityFrameworkCore;
+using QuickBookService.Interfaces;
+using QuickBookService.Services;
 using task_14.Data;
 using task_14.Middleware;
 using task_14.Repository;
 using task_14.Services;
+using XeroService.Interfaces;
+using XeroService.Services;
+using DataAccess.Helper;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -14,8 +20,23 @@ builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IBillRepository, BillRepository>();
 builder.Services.AddScoped<IVendorRepository, VendorRepository>();
 builder.Services.AddScoped<IConnectionRepository, ConnectionRepository>();
-builder.Services.AddScoped<ITokenRespository, TokenService>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+
+builder.Services.AddScoped<ITokenRespository, TokenService>();
+
+builder.Services.AddScoped<IQuickBooksApiService, QuickBooksApiService>();
+builder.Services.AddScoped<IQuickBooksProductService, QuickBooksProductService>();
+builder.Services.AddScoped<IQuickBooksCustomerService, QuickBooksCustomerService>();
+builder.Services.AddScoped<IQuickBooksInvoiceServices, QuickBooksInvoiceService>();
+
+
+builder.Services.AddScoped<IXeroProductService, XeroProductService>();
+builder.Services.AddScoped<IXeroCustomerService, XeroCustomerService>();
+builder.Services.AddScoped<IXeroApiService, XeroApiService>();
+builder.Services.AddScoped<IXeroInvoiceService, XeroInvoiceService>();
+
+
+builder.Services.AddScoped<SyncingFunction>();
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
 

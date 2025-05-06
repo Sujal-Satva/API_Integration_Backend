@@ -4,6 +4,7 @@ using System.Text;
 using task_14.Models;
 using System.Net.Http.Headers;
 using Newtonsoft.Json;
+using SharedModels.Models;
 
 namespace task_14.Middleware
 {
@@ -197,45 +198,22 @@ namespace task_14.Middleware
                         var tokenResponse = JsonConvert.DeserializeObject<TokenResponse>(responseContent);
                         var accessToken = tokenResponse.AccessToken;
                         var refreshToken = tokenResponse.RefreshToken;
-                        var accessTokenExpiry = DateTime.UtcNow.AddDays(tokenResponse.AccessTokenExpiry);
+                        var accessTokenExpiry = DateTime.UtcNow.AddSeconds(tokenResponse.AccessTokenExpiry);
                         var refreshTokenExpiry = DateTime.UtcNow.AddDays(60);
-
-                        var connectionUri = _configuration["Xero:ConnectionPoint"];
-                        var connectionRequest = new HttpRequestMessage(HttpMethod.Get, connectionUri);
-                        connectionRequest.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-
-                        var connectionResponse = await client.SendAsync(connectionRequest);
-
-                        if (!connectionResponse.IsSuccessStatusCode)
-                        {
-                            var errorContent = await connectionResponse.Content.ReadAsStringAsync();
-                            _logger.LogError($"Xero connections retrieval failed: {errorContent}");
-                            return false;
-                        }
-
-                        var connectionBody = await connectionResponse.Content.ReadAsStringAsync();
-                        var connections = JsonConvert.DeserializeObject<List<XeroConnection>>(connectionBody);
-                        var firstTenant = connections.FirstOrDefault();
-                        if (firstTenant == null)
-                        {
-                            _logger.LogError("No tenants found in Xero connections.");
-                            return false;
-                        }
-
                         var xeroTokenResponse = new XeroTokenResponse
                         {
                             AccessToken = accessToken,
                             RefreshToken = refreshToken,
-                            TenantId = firstTenant.TenantId,
-                            TenantName = firstTenant.TenantName,
+                            TenantId = token.TenantId,
+                            TenantName = token.TenantName,
                             AccessTokenExpiry = accessTokenExpiry,
                             RefreshTokenExpiry = refreshTokenExpiry
                         };
 
                         dbContext.Attach(connection);
                         connection.TokenJson = JsonConvert.SerializeObject(xeroTokenResponse);
-                        connection.ExternalId = firstTenant.TenantId;
-                        connection.ExternalName = firstTenant.TenantName;
+                        connection.ExternalId = token.TenantId;
+                        connection.ExternalName = token.TenantName;
                       
                         dbContext.Entry(connection).Property(c => c.TokenJson).IsModified = true;
                         dbContext.Entry(connection).Property(c => c.ExternalId).IsModified = true;

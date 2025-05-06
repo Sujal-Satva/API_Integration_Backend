@@ -1,7 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using DataAccess.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -10,6 +12,7 @@ using System.Text.Json;
 using task_14.Data;
 using task_14.Models;
 using task_14.Services;
+using SharedModels.Models;
 
 
 namespace task_14.Repository
@@ -91,6 +94,7 @@ namespace task_14.Repository
                     TokenJson = JsonConvert.SerializeObject(qboTokenResponse),
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
+                    LastModifiedDate = new DateTime(2000, 1, 1)
                 };
 
                 var saveResult = await _connectionRepository.SaveConnectionAsync(connection);
@@ -231,6 +235,7 @@ namespace task_14.Repository
                     TokenJson = JsonConvert.SerializeObject(xeroTokenResponse),
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
+                    LastModifiedDate = new DateTime(2000, 1, 1)
 
                 };
 

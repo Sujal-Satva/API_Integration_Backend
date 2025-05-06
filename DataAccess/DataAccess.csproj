@@ -23,4 +23,10 @@
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\QuickBookService\QuickBookService.csproj" />
+    <ProjectReference Include="..\SharedModels\SharedModels.csproj" />
+    <ProjectReference Include="..\XeroService\XeroService.csproj" />
+  </ItemGroup>
+
 </Project>

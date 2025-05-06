@@ -1,19 +1,30 @@
 ﻿
 using Microsoft.AspNetCore.Http;
+using SharedModels.Models;
 using task_14.Models;
 
 namespace task_14.Services
 {
     public interface IInvoiceRepository
     {
-        Task<ApiResponse<object>> SyncInvoicesFromQuickBooksAsync(string token, string realmId);
-        Task<PagedResponse<InvoiceDto>> GetInvoicesAsync(int page, int pageSize, string search, string sortBy, string sortDirection,bool pagination);
-        Task<ApiResponse<object>> CreateInvoiceAsync(string token, InvoiceInputModel model,string realmId);
-        Task<ApiResponse<object>> UpdateInvoiceAsync(string token, int invoiceId, InvoiceInputModel model,string realmId);
-        Task<ApiResponse<object>> DeleteInvoiceAsync(string token, int invoiceId, string realmId);
 
-        Task<ApiResponse<object>> ProcessCsvFileAsync(string token, string realmId, IFormFile file);
-        //Task<ApiResponse<object>> HandleCSVUpload(string authorization,string realmId, IFormFile file);
+        Task<CommonResponse<object>> SyncInvoices(string platform);
+        Task<CommonResponse<object>> AddInvoicesAsync(string platform, object input);
+
+        Task<CommonResponse<object>> EditInvoicesAsync(string platform, string id, object input);
+
+        Task<CommonResponse<object>> DeleteInvoiceAsync(string platform, string id, string status);
+
+
+        Task<CommonResponse<PagedResponse<InvoiceDto>>> GetInvoicesAsync(
+            int page,
+            int pageSize,
+            string search,
+            string sortBy,
+            string sortDirection,
+            bool pagination = true,
+            string source = "all");
+
 
     }
 }

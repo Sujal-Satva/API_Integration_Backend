@@ -8,6 +8,8 @@ using task_14.Data;
 using task_14.Services;
 using task_14.Models;
 using Microsoft.EntityFrameworkCore;
+using DataAccess.Services;
+using SharedModels.Models;
 
 namespace task_14.Controllers
 {
@@ -79,7 +81,7 @@ namespace task_14.Controllers
 
             if (result.Status != 200)
             {
-                return StatusCode(result.Status, new CommonResponse<object>(result.Status, result.Message));
+                return StatusCode(result.Status, new CommonResponse<object>(result.Status, result.Message,result.Data));
             }
 
             return Ok(new CommonResponse<object>(200, result.Message, new
@@ -108,7 +110,7 @@ namespace task_14.Controllers
 
             if (result!= null )
             {
-                return StatusCode(result.Status, new CommonResponse<object>(result.Status, result.Message));
+                return StatusCode(result.Status, new CommonResponse<object>(result.Status, result.Message, result.Data));
             }
 
             return Ok(new CommonResponse<object>(200, result.Message, new
@@ -124,20 +126,20 @@ namespace task_14.Controllers
         {
             var quickbooksConnection = await _context.Connections
                 .Where(c => c.SourceAccounting == "QuickBooks")
-                .Select(c => new { c.Id })
+                .Select(c => new { c.ExternalId })
                 .FirstOrDefaultAsync();
 
             var xeroConnection = await _context.Connections
                 .Where(c => c.SourceAccounting == "Xero")
-                .Select(c => new { c.Id })
+                .Select(c => new { c.ExternalId })
                 .FirstOrDefaultAsync();
 
             var response = new CommonResponse<object>(200, "Connection status fetched successfully", new
             {
                 quickbooksConnected = quickbooksConnection != null,
-                quickbooksConnectionId = quickbooksConnection?.Id,
+                quickbooksConnectionId = quickbooksConnection?.ExternalId,
                 xeroConnected = xeroConnection != null,
-                xeroConnectionId = xeroConnection?.Id
+                xeroConnectionId = xeroConnection?.ExternalId
             });
 
             return Ok(response);

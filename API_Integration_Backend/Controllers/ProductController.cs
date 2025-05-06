@@ -2,6 +2,9 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
+using QuickBookService.Interfaces;
+using SharedModels.Models;
+using System.ComponentModel;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
@@ -21,200 +24,173 @@ namespace task_13.Controllers
         private readonly ApplicationDbContext _context;
         private readonly ITokenRespository _tokenRespository;
         private readonly IHttpClientFactory _httpClientFactory;
+        private readonly IQuickBooksProductService _quickBooksProductService;
 
-        public ProductController(IProductRepository productRepository, ApplicationDbContext context, IHttpClientFactory httpClientFactory, ITokenRespository tokenRespository)
+        public ProductController(IProductRepository productRepository, ApplicationDbContext context, IHttpClientFactory httpClientFactory, ITokenRespository tokenRespository,IQuickBooksProductService quickBooksProductService)
         {
             _productRepository = productRepository;
             _context = context;
             _httpClientFactory = httpClientFactory;
             _tokenRespository = tokenRespository;
-        }
-
-        [HttpGet("fetch")]
-        public async Task<IActionResult> SyncItemsFromQuickBooks()
-        {
-            var tokenResult = await _tokenRespository.GetTokenAsync();
-            if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-            {
-                return Unauthorized(new ApiResponse<string>(
-                    error: "Token invalid or expired",
-                    message: "Could not retrieve a valid QuickBooks access token."
-                ));
-            }
-
-            try
-            {
-                var success = await _productRepository.SyncItemsFromQuickBooksAsync(tokenResult.Token, tokenResult.RealmId);
-
-                if (success)
-                {
-                    return Ok(new ApiResponse<string>(message: "Items synced successfully from QuickBooks."));
-                }
-
-                return BadRequest(new ApiResponse<string>(
-                    error: "NoData",
-                    message: "No items found in QuickBooks response."
-                ));
-            }
-            catch (Exception ex)
-            {
-                return StatusCode(500, new ApiResponse<string>(
-                    error: ex.Message,
-                    message: "Error syncing items from QuickBooks."
-                ));
-            }
+            _quickBooksProductService = quickBooksProductService;
         }
 
 
-        [HttpGet]
-        public async Task<IActionResult> GetProducts(
-                [FromQuery] int page,
-                [FromQuery] int pageSize = 10,
-                [FromQuery] string search = "",
-                [FromQuery] string sortColumn = "Name",
-                [FromQuery] string sortDirection = "asc",
-                [FromQuery] bool pagination = true,
-                [FromQuery] bool active=true)
+        [HttpGet("fetch-qbo")]
+        public async Task<IActionResult> FetchItemsFromQuickBooks()
         {
             try
             {
+                var response = await _productRepository.SyncItems("QuickBooks");
 
-                var pagedProducts = await _productRepository.GetPagedProductsAsync(
-                                                search, sortColumn, sortDirection, page, pageSize, pagination, active);
-
-                return Ok(pagedProducts);
+                return StatusCode(response.Status, response); 
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new { message = "Error fetching products", error = ex.Message });
+                var errorResponse = new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
+                );
+
+                return StatusCode(500, errorResponse);
             }
         }
 
-        [HttpPost]
-        public async Task<IActionResult> AddProduct(
-            [FromBody] ProductInputModel inputModel)
-        {
-            var tokenResult = await _tokenRespository.GetTokenAsync();
-            if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-            {
-                return Unauthorized(new ApiResponse<string>(
-                    error: "Token invalid or expired",
-                    message: "Could not retrieve a valid QuickBooks access token."
-                ));
-            }
 
-            var result = await _productRepository.AddProductAsync(tokenResult.Token, tokenResult.RealmId, inputModel);
-
-            if (result.Error != null)
-            {
-                return BadRequest(new ApiResponse<string>(
-                    error: result.Error,
-                    message: "Failed to add product to QuickBooks."
-                ));
-            }
-
-            return Ok(new ApiResponse<object>(
-                data: result.Data,
-                message: "Product added successfully."
-            ));
-        }
-
-
-        [HttpPut("{id}")]
-        public async Task<IActionResult> UpdateProduct(
-            int id,
-            [FromBody] ProductInputModel inputModel)
-        {
-            var tokenResult = await _tokenRespository.GetTokenAsync();
-            if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-            {
-                return Unauthorized(new ApiResponse<string>(
-                    error: "Token invalid or expired",
-                    message: "Could not retrieve a valid QuickBooks access token."
-                ));
-            }
-
-            var result = await _productRepository.UpdateProductAsync(tokenResult.Token, tokenResult.RealmId, id, inputModel);
-
-            if (result.Error != null)
-            {
-                return BadRequest(new ApiResponse<string>(
-                    error: result.Error,
-                    message: "Failed to update product."
-                ));
-            }
-
-            return Ok(new ApiResponse<object>(
-                data: result.Data,
-                message: "Product updated successfully."
-            ));
-        }
-
-
-
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteProduct(int id)
-        {
-            var tokenResult = await _tokenRespository.GetTokenAsync();
-            if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-            {
-                return Unauthorized(new ApiResponse<string>(
-                    error: "Token invalid or expired",
-                    message: "Could not retrieve a valid QuickBooks access token."
-                ));
-            }
-
-            var result = await _productRepository.DeleteProductAsync(tokenResult.Token, tokenResult.RealmId, id);
-
-            if (result.Error != null)
-            {
-                return BadRequest(new ApiResponse<string>(
-                    error: result.Error,
-                    message: "Failed to delete product."
-                ));
-            }
-
-            return Ok(new ApiResponse<object>(
-                data: result.Data,
-                message: "Product deleted successfully."
-            ));
-        }
-
-
-
-        [HttpPut("markActive/{productId}")]
-        public async Task<IActionResult> MarkProductActive([FromRoute] int productId)
+        [HttpGet("fetch-xero")]
+        public async Task<IActionResult> FetchItemsFromXero()
         {
             try
             {
-                var tokenResult = await _tokenRespository.GetTokenAsync();
-                if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-                {
-                    return Unauthorized(new ApiResponse<string>(
-                        error: "Token invalid or expired",
-                        message: "Could not retrieve a valid QuickBooks access token."
-                    ));
-                }
-
-                var result = await _productRepository.MarkProductActiveAsync(tokenResult.Token, tokenResult.RealmId, productId);
-
-                if (result.Error == null)
-                {
-                    return Ok(new ApiResponse<object>(
-                        message: "Product marked as active successfully."
-                    ));
-                }
-
-                return NotFound(new ApiResponse<string>(
-                    error: result.Error,
-                    message: "Product not found."
-                ));
+                var response = await _productRepository.SyncItems("Xero");
+                return StatusCode(response.Status, response);
             }
             catch (Exception ex)
             {
-                return StatusCode(500, new ApiResponse<string>(
-                    error: ex.Message,
-                    message: "Failed to mark product as active."
+                var errorResponse = new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
+                );
+
+                return StatusCode(500, errorResponse);
+            }
+        }
+
+
+        [HttpPost("add")]
+        public async Task<IActionResult> AddItems([FromQuery] string platform, [FromBody] object input)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(platform))
+                    return BadRequest(new CommonResponse<object>(400, "Platform is required (xero or quickbooks)"));
+
+                var response = await _productRepository.AddItemsAsync(platform, input);
+
+                if (response.Status!=200)
+                {
+                    return BadRequest(new CommonResponse<object>(response.Status,response.Message,response.Data));
+                }
+
+                return StatusCode(response.Status, response);
+            }
+            catch (Exception ex)
+            {
+                var errorResponse = new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
+                );
+
+                return StatusCode(500, errorResponse);
+            }
+        }
+
+        [HttpPut("edit")]
+        public async Task<IActionResult> EditItems([FromQuery] string platform, [FromQuery] string itemId, [FromBody] object input)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(platform))
+                    return BadRequest(new CommonResponse<object>(400, "Platform is required (xero or quickbooks)"));
+
+                if (string.IsNullOrEmpty(itemId))
+                    return BadRequest(new CommonResponse<object>(400, "Item ID is required"));
+
+                var response = await _productRepository.EditItemsAsync(platform, itemId, input);
+
+                if (response != null && response.Status != 200)
+                {
+                    return BadRequest(new CommonResponse<object>(response.Status, response.Message, response.Data));
+                }
+
+                return StatusCode(response.Status, response);
+            }
+            catch (Exception ex)
+            {
+                var errorResponse = new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
+                );
+
+                return StatusCode(500, errorResponse);
+            }
+        }
+
+
+        [HttpGet("all")]
+        public async Task<IActionResult> GetItems(string search = "",
+                    string sortColumn = "name",
+                    string sortDirection = "asc",
+                    int page = 1,
+                    int pageSize = 10,
+                    bool pagination = true,
+                    bool active = true,
+                    string sourceSystem = "All",
+                    string sourceType="All")
+        {
+            try
+            {
+                var response = await _productRepository.GetItems(search, sortColumn, sortDirection, page, pageSize, pagination, active, sourceSystem,sourceType);
+                return Ok(response);
+            }
+            catch (Exception ex)
+            {
+                var errorResponse = new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
+                );
+
+                return StatusCode(500, errorResponse);
+            }
+        }
+
+        [HttpPut("update-status")]
+        public async Task<IActionResult> UpdateItemStatus(
+            [FromQuery] string id,
+            [FromQuery] bool status,
+            [FromQuery] string platform)
+        {
+            try
+            {
+                var response = await _productRepository.EditItemStatusAsync(id, status, platform);
+                if (response != null && response.Status != 200)
+                {
+                    return BadRequest(new CommonResponse<object>(response.Status, response.Message, response.Data));
+                }
+
+                return StatusCode(response.Status, response);
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
                 ));
             }
         }

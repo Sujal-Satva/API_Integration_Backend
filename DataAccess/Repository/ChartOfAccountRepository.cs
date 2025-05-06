@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using DataAccess.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using System;
@@ -7,6 +8,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using task_14.Data;
 using task_14.Models;
+using SharedModels.Models;
 using task_14.Services;
 
 public class ChartOfAccountRepository : IChartOfAccountRepository

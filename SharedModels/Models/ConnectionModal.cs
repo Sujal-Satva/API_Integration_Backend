@@ -1,6 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 
-namespace task_14.Models
+namespace SharedModels.Models
 {
     public class ConnectionModal
     {
@@ -13,9 +18,12 @@ namespace task_14.Models
         public string ExternalName { get; set; }
 
         public string TokenJson { get; set; }
-            
+
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
-    }
 
+        public DateTime? LastModifiedDate { get; set; } = DateTime.UtcNow;
+
+        public string? SyncingInfo { get; set; }
+    }
 }

@@ -1,10 +1,11 @@
-﻿namespace task_14.Models
+﻿
+namespace SharedModels.Models
 {
     public class CommonResponse<T>
     {
-        public int Status { get; set; } 
-        public string? Message { get; set; }  
-        public T? Data { get; set; } 
+        public int Status { get; set; }
+        public string? Message { get; set; }
+        public T? Data { get; set; }
 
         public CommonResponse(int? status, string? message = null, T? data = default)
         {

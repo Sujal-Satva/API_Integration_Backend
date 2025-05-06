@@ -1,13 +1,13 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using task_14.Data;
-using task_14.Models;
+using SharedModels.Models;
 using task_14.Services;
 
 
 namespace task_14.Repository
 {
-    public class ConnectionRepository:IConnectionRepository
+    public class ConnectionRepository:DataAccess.Services.IConnectionRepository
     {
 
         private readonly ApplicationDbContext _context;
@@ -72,7 +72,7 @@ namespace task_14.Repository
         {
             try
             {
-                var connection = await _context.Connections.FindAsync(int.Parse(id));
+                var connection = await _context.Connections.FirstOrDefaultAsync(c => c.ExternalId == id);
                 if (connection == null)
                 {
                     return new CommonResponse<ConnectionModal>(401, $"No  connection found");
@@ -87,6 +87,33 @@ namespace task_14.Repository
             {
                 _logger.LogError(ex, $"Error deleting connection with ID {id}");
                 return new CommonResponse<ConnectionModal>(500, "An error occurred while delete the connection");
+            }
+        }
+
+        public async Task<CommonResponse<ConnectionModal>> UpdateConnectionAsync(string id, ConnectionModal updatedConnection)
+        {
+            try
+            {
+                var existingConnection = await _context.Connections
+                    .FirstOrDefaultAsync(c => c.ExternalId == id);
+
+                if (existingConnection == null)
+                {
+                    return new CommonResponse<ConnectionModal>(404, "Connection not found.");
+                }
+                existingConnection.SourceAccounting = updatedConnection.SourceAccounting;
+                existingConnection.ExternalId = updatedConnection.ExternalId;
+                existingConnection.TokenJson = updatedConnection.TokenJson;
+                existingConnection.LastModifiedDate = updatedConnection.LastModifiedDate ?? existingConnection.LastModifiedDate;
+                existingConnection.UpdatedAt = DateTime.UtcNow; 
+                await _context.SaveChangesAsync();
+
+                return new CommonResponse<ConnectionModal>(200, "Connection updated successfully", existingConnection);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error updating connection with ID {id}");
+                return new CommonResponse<ConnectionModal>(500, "An error occurred while updating the connection");
             }
         }
 

@@ -25,6 +25,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\DataAccess\DataAccess.csproj" />
+    <ProjectReference Include="..\QuickBookService\QuickBookService.csproj" />
+    <ProjectReference Include="..\XeroService\XeroService.csproj" />
   </ItemGroup>
 
 </Project>

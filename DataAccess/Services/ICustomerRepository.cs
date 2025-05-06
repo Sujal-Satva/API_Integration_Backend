@@ -1,26 +1,11 @@
-﻿using task_14.Models;
-
+﻿using SharedModels.Models;
+using SharedModels.QuickBooks.Models;
+using task_14.Models;
 namespace task_14.Services
 {
     public interface ICustomerRepository
     {
-        //Task<IEnumerable<Customer>> GetCustomersAsync(int page, int pageSize, string? search, string sortColumn, string sortDirection, bool pagination,bool active);
-        //Task<ApiResponse<string>> AddCustomerAsync(string token, string realmId, CustomerInputModel inputModel);
-        //Task<ApiResponse<string>> UpdateCustomerAsync(string token, string realmId, string id, CustomerInputModel inputModel);
-        //Task<ApiResponse<string>> DeleteCustomerAsync(string token, string realmId, string id);
-        //Task<Customer> GetCustomerByIdAsync(string id);
-        //Task SyncCustomersFromQuickBooksAsync(string token, string realmId);
-        //Task<bool> IsCustomerExistsAsync(string qbId);
-        //Task<ApiResponse<string>> MarkCustomerActiveAsync(string token, string realmId, int customerId);
-        //public Task<int> GetTotalCustomerCountAsync(string? search,bool active);
-
-
-
-        Task<CommonResponse<object>> FetchAndSaveQBOCustomerAsync();
-
-        Task<CommonResponse<object>> FetchAndSaveXeroCustomerAsync();
-
-
+      
         Task<CommonResponse<PagedResponse<CustomerDTO>>> GetCustomersFromDbAsync(
            int page = 1,
            int pageSize = 10,
@@ -31,13 +16,21 @@ namespace task_14.Services
            bool active = true,
            bool pagination = true);
 
-        Task<CommonResponse<object>> AddCustomerAsync(CustomerInputModel model, string platform);
+        
+        //Task<CommonResponse<object>> EditCustomerAsync(CustomerInputModel model, string platform);
 
-        Task<CommonResponse<object>> EditCustomerAsync(CustomerInputModel model, string platform);
+        //Task<CommonResponse<object>> UpdateStatus(string id, string platform, bool status);
 
-        Task<CommonResponse<object>> DeleteCustomerAsync(string id, string platform);
 
-        Task<CommonResponse<object>> UpdateStatus(string id, string platform, bool status);
+        Task<CommonResponse<object>> SyncCustomers(string platform);
+        Task<CommonResponse<object>> AddCustomersAsync(string platform, object input);
+
+        Task<CommonResponse<object>> EditCustomersAsync(string platform, string itemId, CustomerInputModel input);
+
+
+        //Task<CommonResponse<object>> EditCustomerAsync(string platform, string itemId, object input);
+
+        //Task<CommonResponse<object>> EditCustomerStatusAsync(string id, bool status, string platform);
 
     }
 
