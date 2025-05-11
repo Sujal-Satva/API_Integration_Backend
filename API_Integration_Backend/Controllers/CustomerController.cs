@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using task_14.Models;
 using SharedModels.Models;
 using task_14.Services;
-using task_14.Repository;
 using SharedModels.QuickBooks.Models;
 
 
@@ -11,12 +9,10 @@ using SharedModels.QuickBooks.Models;
 public class CustomerController : ControllerBase
 {
     private readonly ICustomerRepository _customerRepository;
-    private readonly ITokenRespository _tokenRespository;
 
-    public CustomerController(ICustomerRepository customerRepository, ITokenRespository tokRespository)
+    public CustomerController(ICustomerRepository customerRepository)
     {
         _customerRepository = customerRepository;
-        _tokenRespository = tokRespository;
     }
 
     [HttpGet("fetch-qbo")]
@@ -57,7 +53,7 @@ public class CustomerController : ControllerBase
                 ex.Message
             );
 
-            return StatusCode(500, errorResponse);
+            return StatusCode(500, errorResponse);  
         }
     }
 
@@ -93,27 +89,22 @@ public class CustomerController : ControllerBase
     [HttpPost("add")]
     public async Task<IActionResult> AddCustomer([FromBody] CustomerInputModel inputModel, [FromQuery] string platform)
     {
-        var response = await _customerRepository.AddCustomersAsync(platform, inputModel) ;
+        var response = await _customerRepository.AddCustomersAsync(platform, inputModel);
         return StatusCode(response.Status, response);
     }
 
     [HttpPut("edit")]
-    public async Task<IActionResult> EditCustomer([FromBody] CustomerInputModel inputModel, [FromQuery] string id,[FromQuery] string platform)
+    public async Task<IActionResult> EditCustomer([FromBody] CustomerInputModel inputModel, [FromQuery] string id, [FromQuery] string platform)
     {
-        var response = await _customerRepository.EditCustomersAsync(platform,id,inputModel);
+        var response = await _customerRepository.EditCustomersAsync(platform, id, inputModel);
         return StatusCode(response.Status, response);
     }
 
 
-    //[HttpPut("update-status")]
-    //public async Task<IActionResult> UpdateStatus([FromQuery] string id, [FromQuery] string platform, [FromBody] UpdateStatusRequest request) {
-    //    var response = await _customerRepository.UpdateStatus(id, platform, request.Status);
-    //    return StatusCode(response.Status, response);
-
-    //}
-    //public class UpdateStatusRequest
-    //{
-    //    public bool Status { get; set; }
-    //}
-
+    [HttpPut("update-status")]
+    public async Task<IActionResult> UpdateStatus([FromQuery] string id, [FromQuery] string platform, [FromQuery] string status)
+    {
+        var response = await _customerRepository.UpdateCustomerStatusAsync(id, platform, status);
+        return StatusCode(response.Status, response);
+    }
 }

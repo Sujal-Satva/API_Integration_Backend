@@ -8,7 +8,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using static QuickBookService.Services.QuickBooksProductService;
 
 namespace QuickBookService.Services
 {
@@ -183,6 +182,43 @@ namespace QuickBookService.Services
                 return new CommonResponse<object>(500, "Error occurred while updating Customer", ex.Message);
             }
         }
+
+        public async Task<CommonResponse<object>> UpdateCustomerStatus(ConnectionModal connection, string id,string status)
+        {
+            try
+            {
+                var syncTokenResult = await GetItemById(connection, id);
+                if (syncTokenResult.Status != 200 || syncTokenResult.Data == null)
+                {
+                    return new CommonResponse<object>(syncTokenResult.Status, "Failed to fetch SyncToken", syncTokenResult.Data);
+                }
+
+                var existingCustomer = (QuickBookCustomer)syncTokenResult.Data;
+                var payload = new
+                {
+                    Id = existingCustomer.Id,
+                    SyncToken = existingCustomer.SyncToken,
+                    DisplayName = existingCustomer.DisplayName,
+                    Active = status
+                };
+
+                var apiResponse = await _quickBooksApiService.QuickBooksPostRequest("customer", payload, connection);
+
+                if (apiResponse.Status == 200 || apiResponse.Status == 201)
+                {
+                    var result = JsonConvert.DeserializeObject<QuickBooksCustomerResponse>(apiResponse.Data.ToString());
+                    var unifiedItems = CustomerMapper.MapQuickBooksCustomerToCommon(new List<QuickBookCustomer> { result.Customer });
+                    return new CommonResponse<object>(200, "Customer updated successfully", unifiedItems);
+                }
+
+                return new CommonResponse<object>(apiResponse.Status, "Failed to update Customer", apiResponse.Data);
+            }
+            catch (Exception ex)
+            {
+                return new CommonResponse<object>(500, "Error occurred while updating Customer", ex.Message);
+            }
+        }
+    
         public class QuickBooksCustomerResponse
         {
             public QuickBookCustomer Customer { get; set; }

@@ -16,22 +16,15 @@ namespace task_14.Services
            bool active = true,
            bool pagination = true);
 
-        
-        //Task<CommonResponse<object>> EditCustomerAsync(CustomerInputModel model, string platform);
-
-        //Task<CommonResponse<object>> UpdateStatus(string id, string platform, bool status);
-
-
         Task<CommonResponse<object>> SyncCustomers(string platform);
-        Task<CommonResponse<object>> AddCustomersAsync(string platform, object input);
+        Task<CommonResponse<object>> AddCustomersAsync(string platform, CustomerInputModel input);
 
         Task<CommonResponse<object>> EditCustomersAsync(string platform, string itemId, CustomerInputModel input);
 
+        Task<CommonResponse<object>> UpdateCustomerStatusAsync(string id, string platform, string status);
 
-        //Task<CommonResponse<object>> EditCustomerAsync(string platform, string itemId, object input);
 
-        //Task<CommonResponse<object>> EditCustomerStatusAsync(string id, bool status, string platform);
-
+      
     }
 
 }

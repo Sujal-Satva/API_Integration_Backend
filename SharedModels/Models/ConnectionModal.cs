@@ -22,7 +22,7 @@ namespace SharedModels.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? UpdatedAt { get; set; }
 
-        public DateTime? LastModifiedDate { get; set; } = DateTime.UtcNow;
+       
 
         public string? SyncingInfo { get; set; }
     }

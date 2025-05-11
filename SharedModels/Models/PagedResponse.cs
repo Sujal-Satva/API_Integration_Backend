@@ -1,4 +1,10 @@
-﻿namespace task_14.Models
+﻿using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace SharedModels.Models
 {
     public class PagedResponse<T>
     {

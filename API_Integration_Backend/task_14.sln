@@ -3,17 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.11.35312.102
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "task_14", "task_14.csproj", "{3DC6B560-125F-4ACB-BEA3-89ED123566B5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "API_INTEGRATION", "API_INTEGRATION.csproj", "{3DC6B560-125F-4ACB-BEA3-89ED123566B5}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{FEAC6C7D-1E85-4CE1-97EF-8865D4EBC274}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DataAccess", "..\DataAccess\DataAccess.csproj", "{8BECBA74-BEC8-47D8-A284-8774AB27B568}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QuickBookService", "..\QuickBookService\QuickBookService.csproj", "{315C2AA3-2DA7-4744-8990-EC278FF7D665}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "QuickBookService", "..\QuickBookService\QuickBookService.csproj", "{315C2AA3-2DA7-4744-8990-EC278FF7D665}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "XeroService", "..\XeroService\XeroService.csproj", "{AE3565B8-DECD-49E3-911F-86E5F73A0A55}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "XeroService", "..\XeroService\XeroService.csproj", "{AE3565B8-DECD-49E3-911F-86E5F73A0A55}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SharedModels", "..\SharedModels\SharedModels.csproj", "{D2175307-12E5-4958-974C-86FFCF8409D5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SharedModels", "..\SharedModels\SharedModels.csproj", "{D2175307-12E5-4958-974C-86FFCF8409D5}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

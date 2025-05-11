@@ -1,16 +1,7 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
-using QuickBookService.Interfaces;
 using SharedModels.Models;
-using System.ComponentModel;
-using System.Net.Http.Headers;
-using System.Text;
-using System.Text.Json;
 using task_14.Data;
-using task_14.Models;
-using task_14.Repository;
 using task_14.Services;
 
 namespace task_13.Controllers
@@ -21,18 +12,11 @@ namespace task_13.Controllers
     {
 
         private readonly IProductRepository _productRepository;
-        private readonly ApplicationDbContext _context;
-        private readonly ITokenRespository _tokenRespository;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IQuickBooksProductService _quickBooksProductService;
+        
 
-        public ProductController(IProductRepository productRepository, ApplicationDbContext context, IHttpClientFactory httpClientFactory, ITokenRespository tokenRespository,IQuickBooksProductService quickBooksProductService)
+        public ProductController(IProductRepository productRepository)
         {
             _productRepository = productRepository;
-            _context = context;
-            _httpClientFactory = httpClientFactory;
-            _tokenRespository = tokenRespository;
-            _quickBooksProductService = quickBooksProductService;
         }
 
 

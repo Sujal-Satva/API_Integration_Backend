@@ -1,7 +1,7 @@
 ﻿
 using DataAccess.Services;
 using Microsoft.AspNetCore.Mvc;
-using System.Runtime.CompilerServices;
+
 using task_14.Data;
 using task_14.Models;
 using task_14.Services;
@@ -13,19 +13,11 @@ namespace task_14.Controllers
     [ApiController]
     public class AccountController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _configuration;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConnectionRepository _connectionRepository;
        
         private readonly IChartOfAccountRepository _chartOfAccountRepository;
-        public AccountController(IConfiguration configuration, ApplicationDbContext context, IHttpClientFactory httpClientFactory,IChartOfAccountRepository chartOfAccountRepository, IConnectionRepository connectionRepository)
+        public AccountController(IChartOfAccountRepository chartOfAccountRepository)
         {
-            _configuration = configuration;
-            _context = context;
-            _httpClientFactory = httpClientFactory;
-            _chartOfAccountRepository = chartOfAccountRepository;
-            _connectionRepository = connectionRepository;
+            _chartOfAccountRepository = chartOfAccountRepository;  
         }
 
         [HttpGet("fetch-qbo")]

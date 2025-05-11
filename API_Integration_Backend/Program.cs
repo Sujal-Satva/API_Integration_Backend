@@ -22,18 +22,19 @@ builder.Services.AddScoped<IVendorRepository, VendorRepository>();
 builder.Services.AddScoped<IConnectionRepository, ConnectionRepository>();
 builder.Services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 
-builder.Services.AddScoped<ITokenRespository, TokenService>();
 
 builder.Services.AddScoped<IQuickBooksApiService, QuickBooksApiService>();
 builder.Services.AddScoped<IQuickBooksProductService, QuickBooksProductService>();
 builder.Services.AddScoped<IQuickBooksCustomerService, QuickBooksCustomerService>();
 builder.Services.AddScoped<IQuickBooksInvoiceServices, QuickBooksInvoiceService>();
-
+builder.Services.AddScoped<IQuickBooksBillService, QuickBooksBillService>();
+builder.Services.AddScoped<IQuickBooksVendorService, QuickBooksVendorService>();
 
 builder.Services.AddScoped<IXeroProductService, XeroProductService>();
 builder.Services.AddScoped<IXeroCustomerService, XeroCustomerService>();
 builder.Services.AddScoped<IXeroApiService, XeroApiService>();
 builder.Services.AddScoped<IXeroInvoiceService, XeroInvoiceService>();
+builder.Services.AddScoped<IXeroBillService, XeroBillService>();
 
 
 builder.Services.AddScoped<SyncingFunction>();

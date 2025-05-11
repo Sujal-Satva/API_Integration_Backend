@@ -19,24 +19,21 @@ namespace task_14.Repository
     public class ProductRepository: IProductRepository
     {
         private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _configuration;
         private readonly SyncingFunction _syncingFunction;
-        private readonly IHttpClientFactory _httpClientFactory;
+        
         private readonly IQuickBooksProductService _quickBooksProductService;
         private readonly IXeroProductService _xeroProductService;
         private readonly IConnectionRepository _connectionRepository;
 
-        public ProductRepository(ApplicationDbContext context, IHttpClientFactory httpClientFactory,SyncingFunction syncingFunction, IConfiguration configuration,IQuickBooksProductService quickBooksProductService,IConnectionRepository connectionRepository,IXeroProductService xeroProductService)
+        public ProductRepository(ApplicationDbContext context,SyncingFunction syncingFunction,IQuickBooksProductService quickBooksProductService,IConnectionRepository connectionRepository,IXeroProductService xeroProductService)
         {
             _context = context;
-            _httpClientFactory = httpClientFactory;
-            _configuration = configuration;
             _quickBooksProductService= quickBooksProductService;
             _connectionRepository = connectionRepository;
             _xeroProductService= xeroProductService;
             _syncingFunction = syncingFunction;
         }
-        
+
         public async Task<CommonResponse<object>> SyncItems(string platform)
         {
             try
@@ -44,18 +41,26 @@ namespace task_14.Repository
                 var connectionResult = await _connectionRepository.GetConnectionAsync(platform);
                 if (connectionResult.Status != 200 || connectionResult.Data == null)
                     return new CommonResponse<object>(connectionResult.Status, connectionResult.Message);
-                CommonResponse<object> response = null;
 
-                if (platform == "QuickBooks")
+                CommonResponse<object> response;
+
+                switch (platform.ToLower())
                 {
-                    response = await _quickBooksProductService.FetchProductsFromQuickBooks(connectionResult.Data);
+                    case "quickbooks":
+                        response = await _quickBooksProductService.FetchProductsFromQuickBooks(connectionResult.Data);
+                        break;
+
+                    case "xero":
+                        response = await _xeroProductService.FetchProductsFromXero(connectionResult.Data);
+                        break;
+
+                    default:
+                        return new CommonResponse<object>(400, $"Unsupported platform: {platform}");
                 }
-                else
-                {
-                    response = await _xeroProductService.FetchProductsFromXero(connectionResult.Data);
-                }
+
                 if (response.Data == null)
                     return new CommonResponse<object>(response.Status, response.Message);
+
                 var unifiedItems = response.Data as List<UnifiedItem>;
                 await _syncingFunction.UpdateSyncingInfo(connectionResult.Data.ExternalId, "Products", DateTime.UtcNow);
                 return await _syncingFunction.StoreUnifiedItemsAsync(unifiedItems);
@@ -65,22 +70,8 @@ namespace task_14.Repository
                 return new CommonResponse<object>(500, "Failed to insert items", ex.Message);
             }
         }
-        
 
 
-        public async Task<CommonResponse<object>> DeleteUnifiedItemAsync(string id)
-        {
-            var item = await _context.UnifiedItems.FirstOrDefaultAsync(i => i.ExternalId == id) ;
-            if (item == null)
-            {
-                return new CommonResponse<object>(404, "Item not found");
-            }
-
-            _context.UnifiedItems.Remove(item);
-            await _context.SaveChangesAsync();
-
-            return new CommonResponse<object>(200, "Item deleted successfully", id);
-        }
         public async Task<CommonResponse<object>> AddItemsAsync(string platform, object input)
         {
             try

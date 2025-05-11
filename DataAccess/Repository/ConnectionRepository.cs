@@ -11,12 +11,12 @@ namespace task_14.Repository
     {
 
         private readonly ApplicationDbContext _context;
-        private readonly ILogger<ConnectionRepository> _logger;
+        
 
-        public ConnectionRepository(ApplicationDbContext context, ILogger<ConnectionRepository> logger)
+        public ConnectionRepository(ApplicationDbContext context)
         {
             _context = context;
-            _logger = logger;
+           
         }
 
         public async Task<CommonResponse<ConnectionModal>> SaveConnectionAsync(ConnectionModal connection)
@@ -44,7 +44,6 @@ namespace task_14.Repository
             }   
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error saving {connection.SourceAccounting} connection");
                 return new CommonResponse<ConnectionModal>(500, "An error occurred while saving the connection");
             }
         }
@@ -62,8 +61,6 @@ namespace task_14.Repository
                 return new CommonResponse<ConnectionModal>(200, "Connection retrieved successfully", connection);
             }
             catch (Exception ex) { 
-            
-                _logger.LogError(ex, $"Error retrieving {platform} connection");
                 return new CommonResponse<ConnectionModal>(500, "An error occurred while retrieving the connection");
             }
         }
@@ -85,7 +82,6 @@ namespace task_14.Repository
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error deleting connection with ID {id}");
                 return new CommonResponse<ConnectionModal>(500, "An error occurred while delete the connection");
             }
         }
@@ -104,7 +100,7 @@ namespace task_14.Repository
                 existingConnection.SourceAccounting = updatedConnection.SourceAccounting;
                 existingConnection.ExternalId = updatedConnection.ExternalId;
                 existingConnection.TokenJson = updatedConnection.TokenJson;
-                existingConnection.LastModifiedDate = updatedConnection.LastModifiedDate ?? existingConnection.LastModifiedDate;
+                
                 existingConnection.UpdatedAt = DateTime.UtcNow; 
                 await _context.SaveChangesAsync();
 
@@ -112,7 +108,6 @@ namespace task_14.Repository
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error updating connection with ID {id}");
                 return new CommonResponse<ConnectionModal>(500, "An error occurred while updating the connection");
             }
         }

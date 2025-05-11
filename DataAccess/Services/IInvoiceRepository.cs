@@ -23,7 +23,8 @@ namespace task_14.Services
             string sortBy,
             string sortDirection,
             bool pagination = true,
-            string source = "all");
+            string source = "all",
+            bool isBill=false);
 
 
     }

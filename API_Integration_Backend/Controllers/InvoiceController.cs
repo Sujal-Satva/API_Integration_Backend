@@ -1,17 +1,7 @@
 ﻿using CsvHelper;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 using SharedModels.Models;
-using System.Formats.Asn1;
-using System.Globalization;
-using System.Net;
-using System.Net.Http.Headers;
-using System.Runtime.CompilerServices;
 using task_14.Data;
-using task_14.Models;
-using task_14.Repository;
 using task_14.Services;
 
 namespace task_14.Controllers
@@ -20,19 +10,12 @@ namespace task_14.Controllers
     [ApiController]
     public class InvoiceController : ControllerBase
     {
-        private readonly IConfiguration _configuration;
-        private readonly IInvoiceRepository _invoiceRepository;
-        private readonly ApplicationDbContext _context;
-        private readonly ITokenRespository _tokenRepository;
-      
         
-        public InvoiceController(IConfiguration configuration, ApplicationDbContext context, IInvoiceRepository invoiceRepository,ITokenRespository tokenRespository)
+        private readonly IInvoiceRepository _invoiceRepository;
+     
+        public InvoiceController(IInvoiceRepository invoiceRepository)
         {
-            _configuration = configuration;
             _invoiceRepository = invoiceRepository;
-            _tokenRepository = tokenRespository;
-            _context = context;
-           
         }
 
 
@@ -175,11 +158,12 @@ namespace task_14.Controllers
             [FromQuery] string? sortBy = "CreatedAt",
             [FromQuery] string? sortDirection = "desc",
             [FromQuery] bool pagination = true,
-            [FromQuery] string? source = "all")
+            [FromQuery] string? source = "all",
+            [FromQuery] bool isBill=false)
         {
             try
             {
-                var result = await _invoiceRepository.GetInvoicesAsync(page, pageSize, search, sortBy, sortDirection, pagination, source);
+                var result = await _invoiceRepository.GetInvoicesAsync(page, pageSize, search, sortBy, sortDirection, pagination, source,isBill);
                 return Ok(result);
             }
             catch (Exception ex)
@@ -192,135 +176,6 @@ namespace task_14.Controllers
                 });
             }
         }
-
-        //[HttpPost]
-        //public async Task<IActionResult> CreateInvoice([FromBody] InvoiceInputModel model)
-        //{
-        //    try
-        //    {
-        //        var tokenResult = await _tokenRepository.GetTokenAsync();
-        //        if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-        //        {
-        //            return Unauthorized(new ApiResponse<object>(
-        //                error: "TokenInvalid",
-        //                message: "QuickBooks access token is invalid or expired."
-        //            ));
-        //        }
-
-        //        var result = await _invoiceRepository.CreateInvoiceAsync(tokenResult.Token, model, tokenResult.RealmId);
-
-        //        if (!string.IsNullOrEmpty(result.Error))
-        //        {
-        //            return StatusCode(500, new ApiResponse<object>(
-        //                error: result.Error,
-        //                message: "Failed to create invoice"
-        //            ));
-        //        }
-
-        //        return Ok(new ApiResponse<object>(
-        //            data: result.Data,
-        //            message: "Invoice created successfully"
-        //        ));
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new ApiResponse<object>(
-        //            error: ex.Message,
-        //            message: "Unexpected error while creating invoice",
-        //            data: new { ex.StackTrace }
-        //        ));
-        //    }
-        //}
-
-
-
-        //[HttpPut("{invoiceId}")]
-        //public async Task<IActionResult> UpdateInvoice(int invoiceId,[FromBody] InvoiceInputModel model)
-        //{
-        //    try
-        //    {
-
-        //        var tokenResult = await _tokenRepository.GetTokenAsync();
-        //        if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-        //        {
-        //            return Unauthorized(new ApiResponse<object>(
-        //                error: "TokenInvalid",
-        //                message: "QuickBooks access token is invalid or expired."
-        //            ));
-        //        }
-
-
-        //        var result = await _invoiceRepository.UpdateInvoiceAsync(tokenResult.Token, invoiceId, model, tokenResult.RealmId);
-        //        if (!string.IsNullOrEmpty(result.Error))
-        //        {
-        //            return StatusCode(500, new ApiResponse<object>(
-        //                error: result.Error,
-        //                message: "Failed to update invoice"
-        //            ));
-        //        }
-        //        return Ok(new ApiResponse<object>(
-        //            data: result.Data,
-        //            message: "Invoice updated successfully"
-        //        ));
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        return StatusCode(500, new ApiResponse<object>(
-        //            error: ex.Message,
-        //            message: "Unexpected error while updating invoice",
-        //            data: new { ex.StackTrace }
-        //        ));
-        //    }
-        //}
-
-        //[HttpDelete("{invoiceId}")]
-        //public async Task<IActionResult> DeleteInvoice(int invoiceId)
-        //{
-        //    try
-        //    {
-
-        //        var tokenResult = await _tokenRepository.GetTokenAsync();
-        //        if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-        //        {
-        //            return Unauthorized(new ApiResponse<string>(
-        //                error: "TokenInvalid",
-        //                message: "QuickBooks access token is invalid or expired."
-        //            ));
-        //        }
-
-
-        //        var result = await _invoiceRepository.DeleteInvoiceAsync(tokenResult.Token, invoiceId, tokenResult.RealmId);
-
-
-        //        if (result.Error != null)
-        //        {
-        //            if (result.Error == "NotFound")
-        //                return NotFound(new ApiResponse<string> { Message = result.Message });
-
-        //            return StatusCode(500, new ApiResponse<string>
-        //            {
-        //                Error = result.Error,
-        //                Message = result.Message
-        //            });
-        //        }
-        //        return Ok(new ApiResponse<string>
-        //        {
-        //            Message = result.Message,
-        //            Data = "Invoice Delete Sucessfully"
-        //        });
-        //    }
-        //    catch (Exception ex)
-        //    {
-
-        //        return StatusCode(500, new ApiResponse<string>
-        //        {
-        //            Error = ex.Message,
-        //            Message = "Delete failed",
-        //            Data = ex.StackTrace
-        //        });
-        //    }
-        //}
-
 
 
         //[HttpPost("upload-csv")]

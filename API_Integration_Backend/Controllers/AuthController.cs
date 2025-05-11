@@ -1,36 +1,26 @@
 ﻿
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
-using System.Net.Http.Headers;
-using System.Net.Http;
-using System.Text;
-using task_14.Data;
 using task_14.Services;
-using task_14.Models;
 using Microsoft.EntityFrameworkCore;
 using DataAccess.Services;
 using SharedModels.Models;
+using task_14.Data;
 
 namespace task_14.Controllers
 {
-    //[Route("api/[controller]")]
     [ApiController]
     public class AuthController : ControllerBase
     {
         private readonly IConfiguration _configuration;
         private readonly IAuthRepository _authRepository;
         private readonly ApplicationDbContext _context;
-        private readonly IHttpClientFactory _httpClientFactory;
         private readonly IConnectionRepository _connectionRepository;
-
-
-        public AuthController(IConfiguration configuration, ApplicationDbContext context,IAuthRepository authRepository, IHttpClientFactory httpClientFactory,IConnectionRepository connectionRepository)
+        public AuthController(IConfiguration configuration,ApplicationDbContext context,IAuthRepository authRepository,IConnectionRepository connectionRepository)
         {
             _configuration = configuration;
             _authRepository = authRepository;
-            _context = context;
-            _httpClientFactory = httpClientFactory;
             _connectionRepository = connectionRepository;
+            _context = context;
         }
 
 

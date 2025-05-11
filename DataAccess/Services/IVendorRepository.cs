@@ -1,14 +1,25 @@
-﻿using task_14.Models;
+﻿using SharedModels.Models;
+using SharedModels.QuickBooks.Models;
+using task_14.Models;
 
 namespace task_14.Services
 {
     public interface IVendorRepository
     {
-        Task<List<Vendor>> SyncVendorsFromQuickBooksAsync(string token, string realmId);
-        Task<ApiResponse<string>> AddVendorAsync(VendorInputModal inputModel, string token, string realmId);
-        Task<ApiResponse<string>> DeactivateVendorAsync(string vendorId, string token, string realmId);
-        Task<ApiResponse<string>> ActivateVendorAsync(string vendorId, string token, string realmId);
-        Task<ApiResponse<string>> UpdateVendorAsync(string vendorId, VendorInputModal inputModel, string token, string realmId);
-        Task<PagedResponse<Vendor>> GetAllActiveVendorsAsync(string? search, string? sortColumn, string? sortDirection, bool pagination, int page, int pageSize,bool active);
+        Task<CommonResponse<object>> SyncVendors(string platform);
+        Task<CommonResponse<PagedResponse<UnifiedVendor>>> GetAllActiveVendorsAsync(
+           string? search,
+           string? sortColumn,
+           string? sortDirection,
+           bool pagination,
+           int page,
+           int pageSize,
+           bool active);
+
+        Task<CommonResponse<object>> AddCustomersAsync(string platform, VendorInputModel input);
+
+        Task<CommonResponse<object>> EditCustomersAsync(string platform, string itemId, VendorInputModel input);
+
+        Task<CommonResponse<object>> UpdateCustomerStatusAsync(string id, string platform, string status);
     }
 }

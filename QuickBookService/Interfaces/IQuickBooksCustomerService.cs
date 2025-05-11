@@ -17,10 +17,7 @@ namespace QuickBookService.Interfaces
         Task<CommonResponse<object>> EditCustomer(ConnectionModal connection, string itemId, CustomerInputModel input);
 
         Task<CommonResponse<object>> GetItemById(ConnectionModal connection, string itemId);
-        //Task<CommonResponse<object>> AddCustomer(ConnectionModal connection, QuickBooksProductInputModel input);
+        Task<CommonResponse<object>> UpdateCustomerStatus(ConnectionModal connection, string id, string status);
 
-        //Task<CommonResponse<object>> EditCusomter(ConnectionModal connection, string itemId, QuickBooksProductInputModel input);
-
-        //Task<CommonResponse<object>> EditQuickBookCustomerStatusAsync(ConnectionModal connection, string itemId, bool status);
     }
 }

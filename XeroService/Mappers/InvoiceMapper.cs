@@ -31,7 +31,7 @@ namespace XeroService.Mappers
             }
             var addresses = new List<InvoiceAddress>();
 
-            // Map line items to JSON
+            // Map line items to JSO
             var lineItems = new List<InvoiceLineItem>();
 
             if (xeroInvoice.LineItems != null)

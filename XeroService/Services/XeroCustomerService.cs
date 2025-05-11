@@ -109,14 +109,14 @@ namespace XeroService.Services
 
                     var unifiedItems = CustomerMapper.MapXeroProductsToUnifiedCustomers(products);
 
-                    return new CommonResponse<object>(200, "Product added successfully to Xero", unifiedItems);
+                    return new CommonResponse<object>(200, "Customer added successfully to Xero", unifiedItems);
                 }
 
-                return new CommonResponse<object>(apiResponse.Status, "Failed to add product to Xero", apiResponse.Data);
+                return new CommonResponse<object>(apiResponse.Status, "Failed to add Customer to Xero", apiResponse.Data);
             }
             catch (Exception ex)
             {
-                return new CommonResponse<object>(500, "Error occurred while adding product to Xero", ex.Message);
+                return new CommonResponse<object>(500, "Error occurred while adding Customer to Xero", ex.Message);
             }
         }
 
@@ -165,15 +165,64 @@ namespace XeroService.Services
                     var products = final?.Contacts;
 
                     var unifiedItems = CustomerMapper.MapXeroProductsToUnifiedCustomers(products);
-                    return new CommonResponse<object>(200, "Product updated successfully in Xero", unifiedItems);
+                    return new CommonResponse<object>(200, "Customer updated successfully in Xero", unifiedItems);
                 }
 
-                return new CommonResponse<object>(apiResponse.Status, "Failed to update product in Xero", apiResponse.Data);
+                return new CommonResponse<object>(apiResponse.Status, "Failed to update Customer in Xero", apiResponse.Data);
+            }   
+            catch (Exception ex)
+            {
+                return new CommonResponse<object>(500, "Error occurred while updating Customer in Xero", ex.Message);
+            }
+        }
+
+        public async Task<CommonResponse<object>> UpdateCustomerStatus(ConnectionModal connection, string contactId, string status)
+        {
+            try
+            {
+                
+                string xeroStatus = status.ToLower() switch
+                {
+                    "active" => "ACTIVE",
+                    "archived" => "ARCHIVED",
+                    _ => null
+                };
+
+                if (xeroStatus == null)
+                {
+                    return new CommonResponse<object>(400, "Invalid status. Use 'active' or 'archived'.");
+                }
+
+                var payload = new
+                {
+                    Contacts = new[]
+                    {
+                new
+                {
+                    ContactID = contactId,
+                    IsCustomer = true,
+                    ContactStatus = xeroStatus
+                }
+            }
+                };
+
+                var apiResponse = await _xeroApiService.XeroPostRequest($"/Contacts/{contactId}", payload, connection);
+
+                if (apiResponse.Status == 200)
+                {
+                    var final = JsonConvert.DeserializeObject<XeroCustomerResponse>(apiResponse.Data.ToString());
+                    var unifiedItems = CustomerMapper.MapXeroProductsToUnifiedCustomers(final?.Contacts);
+
+                    return new CommonResponse<object>(200, $"Customer {(xeroStatus == "ARCHIVED" ? "archived" : "reactivated")} successfully in Xero", unifiedItems);
+                }
+
+                return new CommonResponse<object>(apiResponse.Status, "Failed to update customer status in Xero", apiResponse.Data);
             }
             catch (Exception ex)
             {
-                return new CommonResponse<object>(500, "Error occurred while updating product in Xero", ex.Message);
+                return new CommonResponse<object>(500, "Error occurred while updating customer status in Xero", ex.Message);
             }
         }
+
     }
 }

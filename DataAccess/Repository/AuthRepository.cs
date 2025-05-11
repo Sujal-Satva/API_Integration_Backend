@@ -94,7 +94,7 @@ namespace task_14.Repository
                     TokenJson = JsonConvert.SerializeObject(qboTokenResponse),
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
-                    LastModifiedDate = new DateTime(2000, 1, 1)
+                    
                 };
 
                 var saveResult = await _connectionRepository.SaveConnectionAsync(connection);
@@ -235,7 +235,7 @@ namespace task_14.Repository
                     TokenJson = JsonConvert.SerializeObject(xeroTokenResponse),
                     CreatedAt = DateTime.UtcNow,
                     UpdatedAt = DateTime.UtcNow,
-                    LastModifiedDate = new DateTime(2000, 1, 1)
+                    
 
                 };
 
@@ -270,82 +270,5 @@ namespace task_14.Repository
                 return new CommonResponse<XeroTokenResponse>(500, "An error occurred while processing the Xero callback");
             }
         }
-
-
-
-        //public async Task<bool> RevokeTokenAsync(string refreshToken)
-        //{
-        //    var clientId = _configuration["QuickBooks:ClientId"];
-        //    var clientSecret = _configuration["QuickBooks:ClientSecret"];
-        //    var base64Credentials = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
-
-        //    var url = "https://developer.api.intuit.com/v2/oauth2/tokens/revoke";
-        //    var request = new HttpRequestMessage(HttpMethod.Post, url);
-        //    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-        //    request.Headers.Authorization = new AuthenticationHeaderValue("Basic", base64Credentials);
-
-        //    var payload = new { token = refreshToken };
-        //    var jsonPayload = System.Text.Json.JsonSerializer.Serialize(payload);
-        //    request.Content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
-
-        //    var response = await _httpClient.SendAsync(request);
-        //    var responseContent = await response.Content.ReadAsStringAsync();
-
-        //    return response.IsSuccessStatusCode;
-        //}
-
-        //public async Task<(string AccessToken, string RefreshToken)> RefreshQuickBooksTokenAsync(string oldRefreshToken,string realmId)
-        //{
-        //    var clientId = _configuration["QuickBooks:ClientId"];
-        //    var clientSecret = _configuration["QuickBooks:ClientSecret"];
-        //    var redirectUri = _configuration["QuickBooks:RedirectUri"];
-        //    var tokenUrl = _configuration["QuickBookTokenUrl"];
-
-        //    using var httpClient = new HttpClient();
-
-        //    var requestBody = new Dictionary<string, string>
-        //    {
-        //            { "grant_type", "refresh_token" },
-        //            { "refresh_token", oldRefreshToken },
-        //            { "redirect_uri", redirectUri }
-        //    };
-
-        //    var authHeader = Convert.ToBase64String(Encoding.UTF8.GetBytes($"{clientId}:{clientSecret}"));
-        //    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authHeader);
-        //    httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        //    var response = await httpClient.PostAsync(tokenUrl, new FormUrlEncodedContent(requestBody));
-        //    var content = await response.Content.ReadAsStringAsync();
-
-        //    if (response.IsSuccessStatusCode)
-        //    {
-        //        var tokenResult = JsonDocument.Parse(content).RootElement;
-        //        var newAccessToken = tokenResult.GetProperty("access_token").GetString();
-        //        var newRefreshToken = tokenResult.TryGetProperty("refresh_token", out var refreshElement)
-        //            ? refreshElement.GetString()
-        //            : oldRefreshToken;
-        //        var accessTokenExpiresIn = tokenResult.GetProperty("expires_in").GetInt32();
-        //        var accessTokenExpiryDate = DateTime.UtcNow.AddSeconds(accessTokenExpiresIn);
-        //        var refreshTokenExpiryDate = tokenResult.TryGetProperty("x_refresh_token_expires_in", out var refreshExpiryElement)
-        //            ? DateTime.UtcNow.AddSeconds(refreshExpiryElement.GetInt32())
-        //            : DateTime.UtcNow.AddDays(90);
-        //        var existingToken = await _context.QuickBooksTokens.FirstOrDefaultAsync(q => q.RealmId == realmId);
-        //        if (existingToken != null)
-        //        {
-        //            existingToken.AccessToken = newAccessToken;
-        //            existingToken.RefreshToken = newRefreshToken;
-        //            existingToken.AccessTokenExpiry = accessTokenExpiryDate;
-        //            existingToken.RefreshTokenExpiry = refreshTokenExpiryDate;
-        //            _context.QuickBooksTokens.Update(existingToken);
-        //        }
-        //        await _context.SaveChangesAsync();
-        //        return (newAccessToken, newRefreshToken);
-        //    }
-        //    Console.WriteLine("Token refresh failed: " + content);
-        //    throw new UnauthorizedAccessException("Failed to refresh QuickBooks token.");
-        //}
-
-
-
     }
 }

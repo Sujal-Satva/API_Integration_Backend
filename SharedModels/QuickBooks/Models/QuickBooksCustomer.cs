@@ -71,7 +71,7 @@ namespace SharedModels.QuickBooks.Models
     public class CustomerInputModel
     {
         [Required]
-        public string DisplayName { get; set; } = string.Empty;
+        public string DisplayName { get; set; } 
         public string? GivenName { get; set; }
         public string? FamilyName { get; set; }
         public string? EmailAddress { get; set; }

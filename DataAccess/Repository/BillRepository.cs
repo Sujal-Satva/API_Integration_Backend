@@ -1,384 +1,409 @@
-﻿using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
+﻿using DataAccess.Helper;
+using DataAccess.Services;
+using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+using QuickBookService.Interfaces;
+
+using SharedModels.Models;
+using SharedModels.QuickBooks.Models;
+using SharedModels.Xero.Models;
 using System.Net.Http.Headers;
 using task_14.Data;
 using task_14.Models;
 using task_14.Services;
+using XeroService.Interfaces;
+using XeroService.Services;
 
 namespace task_14.Repository
 {
     public class BillRepository:IBillRepository
     {
         private readonly ApplicationDbContext _context;
-        private readonly IHttpClientFactory _httpClientFactory;
-        private readonly IConfiguration _configuration;
+        private readonly IConnectionRepository _connectionRepository;
+        private readonly IXeroBillService _xeroBillService;
+        private readonly IQuickBooksBillService _quickBooksBillService;
+        private readonly SyncingFunction _syncingFunction;
 
-        public BillRepository(ApplicationDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+
+        public BillRepository(ApplicationDbContext context,IXeroBillService xeroBillService,SyncingFunction syncingFunction, IQuickBooksBillService quickBooksBillService, IConnectionRepository connectionRepository)
         {
             _context = context;
-            _httpClientFactory = httpClientFactory;
-            _configuration = configuration;
+            _quickBooksBillService = quickBooksBillService;
+            _connectionRepository = connectionRepository;
+            _syncingFunction = syncingFunction;
+            _xeroBillService = xeroBillService;
         }
 
-        public async Task<ApiResponse<string>> SyncBillsFromQuickBooksAsync(string token, string realmId)
+
+        public async Task<CommonResponse<object>> SyncBills(string platform)
         {
             try
             {
-                var qburl = _configuration["QuickBookBaseUrl"];
-                var request = new HttpRequestMessage(HttpMethod.Get,
-                    $"{qburl}{realmId}/query?query=SELECT * FROM Bill");
+                var connectionResult = await _connectionRepository.GetConnectionAsync(platform);
+                if (connectionResult.Status != 200 || connectionResult.Data == null)
+                    return new CommonResponse<object>(connectionResult.Status, connectionResult.Message);
 
-                request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-                request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                CommonResponse<object> response;
 
-                var client = _httpClientFactory.CreateClient();
-                var response = await client.SendAsync(request);
-
-                if (!response.IsSuccessStatusCode)
+                switch (platform.ToLower())
                 {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    return new ApiResponse<string>(error: errorContent, message: "Failed to fetch bills from QuickBooks.");
+                    case "quickbooks":
+                        response = await _quickBooksBillService.FetchBillsFromQuickBooks(connectionResult.Data);
+                        break;
+
+                    case "xero":
+                        response = await _xeroBillService.FetchBillsFromXero(connectionResult.Data);
+                        break;
+
+                    default:
+                        return new CommonResponse<object>(400, $"Unsupported platform: {platform}");
                 }
 
-                var content = await response.Content.ReadAsStringAsync();
-                var json = JObject.Parse(content);
-                var bills = json["QueryResponse"]?["Bill"]?.ToObject<List<QuickBooksBillDto>>();
+                if (response.Data == null)
+                    return new CommonResponse<object>(response.Status, response.Message);
 
-                if (bills == null || !bills.Any())
-                    return new ApiResponse<string>("No bills found to sync.");
+                var unifiedItems = response.Data as List<UnifiedBill>;
+                if (unifiedItems == null || !unifiedItems.Any())
+                    return new CommonResponse<object>(400, "No bills found to sync");
 
-                foreach (var qbBill in bills)
-                {
-                    var existingBill = await _context.Bills
-                        .Include(b => b.BillLines)
-                        .FirstOrDefaultAsync(b => b.QuickBooksBillId == qbBill.Id);
-
-                    if (existingBill == null)
-                    {
-             
-                        var newBill = MapQuickBooksBillToEntity(qbBill);
-                        _context.Bills.Add(newBill);
-                    }
-                    else
-                    {
-                      
-                        existingBill.SyncToken = qbBill.SyncToken ?? "";
-                        existingBill.TxnDate = qbBill.TxnDate ?? DateTime.MinValue;
-                        existingBill.DueDate = qbBill.DueDate ?? DateTime.MinValue;
-                        existingBill.TotalAmt = qbBill.TotalAmt;
-                        existingBill.Balance = qbBill.Balance;
-                        existingBill.PrivateNote = qbBill.PrivateNote ?? "";
-                        existingBill.CurrencyValue = qbBill.Currency?.Value ?? "";
-                        existingBill.CurrencyName = qbBill.Currency?.Name ?? "";
-                        existingBill.VendorId = qbBill.VendorRef?.Value ?? "";
-                        existingBill.APAccountId = qbBill.APAccountRef?.Value ?? "";
-                        existingBill.CreateTime = qbBill.MetaData?.CreateTime ?? DateTime.MinValue;
-                        existingBill.LastUpdatedTime = qbBill.MetaData?.LastUpdatedTime ?? DateTime.MinValue;
-
-                    
-                        _context.BillLines.RemoveRange(existingBill.BillLines);
-                        existingBill.BillLines = MapBillLines(qbBill.Line);
-                    }
-                }
-
-                await _context.SaveChangesAsync();
-                return new ApiResponse<string>("Bills synced successfully.");
+                await _syncingFunction.UpdateSyncingInfo(connectionResult.Data.ExternalId, "Bills", DateTime.UtcNow);
+                return await _syncingFunction.StoreUnifiedBillsAsync(unifiedItems);
             }
             catch (Exception ex)
             {
-                return new ApiResponse<string>(error: ex.Message, message: "An error occurred while syncing bills.");
+                return new CommonResponse<object>(500, "Failed to sync bills", ex.Message);
             }
         }
 
 
-        public async Task<PagedResponse<object>> GetBillsAsync(
+        private static List<BillLineItem> DeserializeLineItems(string lineItemsJson)
+        {
+            if (string.IsNullOrWhiteSpace(lineItemsJson))
+            {
+                return new List<BillLineItem>(); 
+            }
+
+            try
+            {
+                return JsonConvert.DeserializeObject<List<BillLineItem>>(lineItemsJson);
+            }
+            catch (JsonException ex)
+            {
+                
+                return new List<BillLineItem>();
+            }
+        }
+
+            private static Contact DeserializeVendorDetails(string vendorDetailsJson)
+            {
+                if (string.IsNullOrWhiteSpace(vendorDetailsJson))
+                {
+                    return null;  
+                }
+
+                try
+                {
+                    return JsonConvert.DeserializeObject<Contact>(vendorDetailsJson);
+                }
+                catch (JsonException ex)
+                { 
+                    return null; 
+                }
+            }
+
+        public async Task<CommonResponse<PagedResponse<object>>> GetBillsAsync(
             int page = 1,
             int pageSize = 10,
             string? search = null,
             string? sortColumn = null,
             string? sortDirection = "asc",
-            bool pagination = true)
+            bool pagination = true, 
+            string sourceSystem = "all")
         {
-            if (page <= 0) page = 1;
-            if (pageSize <= 0) pageSize = 10;
-
-            var query = _context.Bills
-                .Include(b => b.BillLines)
-                .AsQueryable();
-
-            sortColumn = string.IsNullOrEmpty(sortColumn) ? "TxnDate" : sortColumn.ToLower();
-            sortDirection = string.IsNullOrEmpty(sortDirection) ? "asc" : sortDirection.ToLower();
-
-            query = sortColumn switch
+            try
             {
-                "duedate" => sortDirection == "desc" ? query.OrderByDescending(b => b.DueDate) : query.OrderBy(b => b.DueDate),
-                "totalamt" => sortDirection == "desc" ? query.OrderByDescending(b => b.TotalAmt) : query.OrderBy(b => b.TotalAmt),
-                "balance" => sortDirection == "desc" ? query.OrderByDescending(b => b.Balance) : query.OrderBy(b => b.Balance),
-                "currencyname" => sortDirection == "desc" ? query.OrderByDescending(b => b.CurrencyName) : query.OrderBy(b => b.CurrencyName),
-                _ => sortDirection == "desc" ? query.OrderByDescending(b => b.TxnDate) : query.OrderBy(b => b.TxnDate),
-            };
+                var query = _context.UnifiedBills.AsQueryable();
 
-        
-            var products = await _context.Products
-                .GroupBy(p => p.QBItemId)
-                .Select(g => g.First())
-                .ToDictionaryAsync(p => p.QBItemId ?? "", p => p.Name ?? "");
+                query = query.Where(i => i.Status != "VOIDED" && i.Status != "DELETED");
 
-            var vendors = await _context.Vendors
-                .GroupBy(v => v.VId)
-                .Select(g => g.First())
-                .ToDictionaryAsync(v => v.VId ?? "", v => v.DisplayName ?? "");
-
-            //var accounts = await _context.ChartOfAccounts
-            //    .GroupBy(a => a.QBAccountId)
-            //    .Select(g => g.First())
-            //    .ToDictionaryAsync(a => a.QBAccountId ?? "", a => a.Name ?? "");
-
-            var customers = await _context.Customers
-                .GroupBy(c => c.Id)
-                .Select(g => g.First())
-                .ToDictionaryAsync(c => c.Id, c => c.DisplayName ?? "");
-
-           
-            var rawBills = await query.ToListAsync();
-
-        
-            var enrichedBills = rawBills.Select(b =>
-            {
-                vendors.TryGetValue(b.VendorId ?? "", out var vendorName);
-                //accounts.TryGetValue(b.APAccountId ?? "", out var apAccountName);
-
-                return new
+                if (!string.IsNullOrEmpty(sourceSystem) && sourceSystem.ToLower() != "all")
                 {
-                    b.Id,
-                    b.QuickBooksBillId,
-                    b.TxnDate,
-                    b.DueDate,
-                    b.TotalAmt,
-                    b.Balance,
-                    b.PrivateNote,
-                    b.CurrencyName,
-                    b.CurrencyValue,
-                    VendorName = vendorName,
-                    //APAccountName = apAccountName,
-                    b.CreateTime,
-                    b.LastUpdatedTime,
-                    BillLines = b.BillLines.Select(line =>
+                    query = query.Where(b => b.SourceSystem == sourceSystem);
+                }
+
+                if (!string.IsNullOrWhiteSpace(search))
+                {
+                    query = query.Where(b =>
+                        b.VendorName.Contains(search) ||
+                        b.ExternalId.Contains(search));
+                }
+
+                if (!string.IsNullOrWhiteSpace(sortColumn))
+                {
+                    bool descending = sortDirection?.ToLower() == "desc";
+
+                    query = sortColumn.ToLower() switch
                     {
-                        //accounts.TryGetValue(line.AccountId ?? "", out var accountName);
-                        customers.TryGetValue(line.CustomerId, out var customerName);
-                        products.TryGetValue(line.ItemId ?? "", out var productName);
+                        "vendorname" => descending ? query.OrderByDescending(b => b.VendorName) : query.OrderBy(b => b.VendorName),
+                        "issuedate" => descending ? query.OrderByDescending(b => b.IssueDate) : query.OrderBy(b => b.IssueDate),
+                        "duedate" => descending ? query.OrderByDescending(b => b.DueDate) : query.OrderBy(b => b.DueDate),
+                        "totalamount" => descending ? query.OrderByDescending(b => b.TotalAmount) : query.OrderBy(b => b.TotalAmount),
+                        "status" => descending ? query.OrderByDescending(b => b.Status) : query.OrderBy(b => b.Status),
+                        _ => query.OrderByDescending(b => b.UpdatedAt) 
+                    };
+                }
+                
 
-                        return new
-                        {
-                            line.Id,
-                            line.LineNum,
-                            line.Description,
-                            line.Amount,
-                            line.DetailType,
-                            //AccountName = accountName,
-                            CustomerName = customerName,
-                            ProductName = productName,
-                            line.BillableStatus,
-                            line.Qty,
-                            line.UnitPrice
-                        };
-                    }).ToList()
-                };
-            }).ToList();
-            if (!string.IsNullOrWhiteSpace(search))
-            {
-                search = search.ToLower();
-                enrichedBills = enrichedBills.Where(b =>
-                    (b.PrivateNote?.ToLower().Contains(search) ?? false) ||
-                    (b.CurrencyName?.ToLower().Contains(search) ?? false) ||
-                    (b.CurrencyValue?.ToString().ToLower().Contains(search) ?? false) ||
-                    (b.VendorName?.ToLower().Contains(search) ?? false) ||
-                    //(b.APAccountName?.ToLower().Contains(search) ?? false) ||
-                    b.BillLines.Any(line =>
-                        (line.Description?.ToLower().Contains(search) ?? false) ||
-                        //(line.AccountName?.ToLower().Contains(search) ?? false) ||
-                        (line.CustomerName?.ToLower().Contains(search) ?? false) ||
-                        (line.ProductName?.ToLower().Contains(search) ?? false)
-                    )
-                ).ToList();
+                var totalRecords = await query.CountAsync();
+
+                if (pagination)
+                {
+                    query = query.Skip((page - 1) * pageSize).Take(pageSize);
+                }
+
+                var bills = await query.ToListAsync();
+                var transformedBills = bills.Select(bill => new
+                {
+                    bill.Id,
+                    bill.ExternalId,
+                    bill.SourceSystem,
+                    bill.VendorName,
+                    bill.VendorId,
+                    bill.IssueDate,
+                    bill.DueDate,
+                    bill.Currency,
+                    bill.TotalAmount,
+                    bill.Status,
+                    bill.CreatedAt,
+                    bill.UpdatedAt,
+                    // Use DeserializeLineItems for line items
+                    LineItems = DeserializeLineItems(bill.LineItems),
+                    VendorDetails = DeserializeVendorDetails(bill.VendorDetails)
+                }).ToList();
+
+                var response = new PagedResponse<object>(
+                    transformedBills,  // Use the transformed data here
+                    page,
+                    pageSize,
+                    totalRecords
+                );
+
+                return new CommonResponse<PagedResponse<object>>(200, "Bills fetched successfully", response);
             }
-
-            var filteredTotalRecords = enrichedBills.Count;
-            if (pagination)
+            catch (Exception ex)
             {
-                enrichedBills = enrichedBills.Skip((page - 1) * pageSize).Take(pageSize).ToList();
+                // Handle exception and return a response
+                return new CommonResponse<PagedResponse<object>>(500, "Error fetching bills", null);
             }
-
-            return new PagedResponse<object>(enrichedBills, page, pageSize, filteredTotalRecords);
         }
 
-
-
-        public async Task<ApiResponse<string>> CreateBillAsync(QuickBooksBillCreateDto billDto, string token, string realmId)
+        public async Task<CommonResponse<object>> AddBillsAsync(string platform, object input)
         {
-
-            var payload = new
+            try
             {
-                VendorRef = new { value = billDto.VendorRef.Value },
-                APAccountRef = new { value = billDto.APAccountRef.Value },
-                TxnDate = billDto.TxnDate,
-                DueDate = billDto.DueDate,
-                PrivateNote = billDto.PrivateNote,
-                Line = billDto.Line.Select(line => new
+                if (string.IsNullOrWhiteSpace(platform))
+                    return new CommonResponse<object>(400, "Platform is required");
+
+                var connectionResult = await _connectionRepository.GetConnectionAsync(platform);
+                if (connectionResult.Status != 200 || connectionResult.Data == null)
+                    return new CommonResponse<object>(connectionResult.Status, connectionResult.Message);
+
+                CommonResponse<object> response;
+
+                switch (platform.ToLower())
                 {
-                    Amount = line.Amount,
-                    DetailType = line.DetailType,
-                    Description = line.Description,
-                    AccountBasedExpenseLineDetail = line.AccountBasedExpenseLineDetail != null ? new
-                    {
-                        AccountRef = new { value = line.AccountBasedExpenseLineDetail.AccountRef.Value },
-                        CustomerRef = line.AccountBasedExpenseLineDetail.CustomerRef != null ? new { value = line.AccountBasedExpenseLineDetail.CustomerRef.Value } : null
-                    } : null,
-                    ItemBasedExpenseLineDetail = line.ItemBasedExpenseLineDetail != null ? new
-                    {
-                        ItemRef = new { value = line.ItemBasedExpenseLineDetail.ItemRef.Value },
-                        Qty = line.ItemBasedExpenseLineDetail.Qty,
-                        UnitPrice = line.ItemBasedExpenseLineDetail.UnitPrice,
-                        CustomerRef = line.ItemBasedExpenseLineDetail.CustomerRef != null ? new { value = line.ItemBasedExpenseLineDetail.CustomerRef.Value } : null,
-                        BillableStatus = line.ItemBasedExpenseLineDetail.BillableStatus
-                    } : null
-                }).ToList(),
-                TotalAmt = billDto.TotalAmt,
-                CurrencyRef = new { value = billDto.CurrencyRef.Value }
-            };
+                    case "xero":
+                        var xeroModel = JsonConvert.DeserializeObject<UnifiedInvoiceInputModel>(input.ToString());
+                        response = await _xeroBillService.AddBill(connectionResult.Data, xeroModel);
+                        break;
 
-           
-            var json = JsonConvert.SerializeObject(payload);
+                    case "quickbooks":
+                        var qbModel = JsonConvert.DeserializeObject<CreateBillRequest>(input.ToString());
+                        response = await _quickBooksBillService.AddBillToQuickBooks(qbModel,connectionResult.Data);
+                        break;
 
-            var client = _httpClientFactory.CreateClient();
-            var qburl = _configuration["QuickBookBaseUrl"];
-            var request = new HttpRequestMessage(HttpMethod.Post, $"{qburl}{realmId}/bill?minorversion=65")
-            {
-                Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
-            };
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+                    default:
+                        return new CommonResponse<object>(400, "Unsupported platform. Use 'xero' or 'quickbooks'.");
+                }
 
-            var response = await client.SendAsync(request);
+                if (response.Data is List<UnifiedBill> bills && bills.FirstOrDefault() is UnifiedBill updatedBill)
 
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                return new ApiResponse<string>
                 {
-                    Message = "Failed to create bill in QuickBooks.",
-                    Error=error
-                };
+                    await _syncingFunction.StoreUnifiedBillsAsync(bills);
+                }
+
+                return response;
             }
-
-            var content = await response.Content.ReadAsStringAsync();
-            var jsonResponse = JObject.Parse(content);
-            var qbBill = jsonResponse["Bill"]?.ToObject<QuickBooksBillDto>();
-
-            if (qbBill == null)
+            catch (Exception ex)
             {
-                return new ApiResponse<string>
-                {
-                    Message = "QuickBooks returned an empty response.",
-                    Data = content
-                };
+                return new CommonResponse<object>(500, "An error occurred while adding the item", ex.Message);
             }
-            var bill = new Bill
-            {
-                QuickBooksBillId = qbBill.Id,
-                SyncToken = qbBill.SyncToken,
-                TxnDate = qbBill.TxnDate,
-                DueDate = qbBill.DueDate,
-                TotalAmt = qbBill.TotalAmt,
-                Balance = qbBill.Balance,
-                PrivateNote = qbBill.PrivateNote,
-                CurrencyValue = qbBill.Currency?.Value,
-                CurrencyName = qbBill.Currency?.Name,
-                VendorId = qbBill.VendorRef?.Value,
-                APAccountId = qbBill.APAccountRef?.Value,
-                CreateTime = qbBill.MetaData?.CreateTime,
-                LastUpdatedTime = qbBill.MetaData?.LastUpdatedTime,
-                BillLines = new List<BillLine>()
-            };
-
-            foreach (var line in qbBill.Line ?? new List<QuickBooksLineDto>())
-            {
-                var billLine = new BillLine
-                {
-                    QuickBooksLineId = line.Id,
-                    LineNum = line.LineNum ?? 0,
-                    Description = line.Description,
-                    Amount = line.Amount,
-                    DetailType = line.DetailType,
-                    AccountId = line.AccountBasedExpenseLineDetail?.AccountRef?.Value,
-                    CustomerId = int.TryParse(line.AccountBasedExpenseLineDetail?.CustomerRef?.Value, out var cid) ? cid : 0,
-                    BillableStatus = line.ItemBasedExpenseLineDetail?.BillableStatus,
-                    ItemId = line.ItemBasedExpenseLineDetail?.ItemRef?.Value,
-                    Qty = line.ItemBasedExpenseLineDetail?.Qty,
-                    UnitPrice = line.ItemBasedExpenseLineDetail?.UnitPrice
-                };
-
-                bill.BillLines.Add(billLine);
-            }
-            _context.Bills.Add(bill);
-            await _context.SaveChangesAsync();
-
-            return new ApiResponse<string>
-            {
-                Message = "Bill successfully created in QuickBooks and saved locally.",
-                Data = qbBill.Id,
-                Error=null
-            };
         }
 
-        private Bill MapQuickBooksBillToEntity(QuickBooksBillDto qbBill)
-        {
-            return new Bill
-            {
-                QuickBooksBillId = qbBill.Id,
-                SyncToken = qbBill.SyncToken ?? "",
-                TxnDate = qbBill.TxnDate ?? DateTime.MinValue,
-                DueDate = qbBill.DueDate ?? DateTime.MinValue,
-                TotalAmt = qbBill.TotalAmt,
-                Balance = qbBill.Balance,
-                PrivateNote = qbBill.PrivateNote ?? "",
-                CurrencyValue = qbBill.Currency?.Value ?? "",
-                CurrencyName = qbBill.Currency?.Name ?? "",
-                VendorId = qbBill.VendorRef?.Value ?? "",
-                APAccountId = qbBill.APAccountRef?.Value ?? "",
-                CreateTime = qbBill.MetaData?.CreateTime ?? DateTime.MinValue,
-                LastUpdatedTime = qbBill.MetaData?.LastUpdatedTime ?? DateTime.MinValue,
-                BillLines = MapBillLines(qbBill.Line)
-            };
-        }
 
-        private List<BillLine> MapBillLines(List<QuickBooksLineDto> lines)
-        {
-            var billLines = new List<BillLine>();
 
-            foreach (var line in lines)
-            {
-                billLines.Add(new BillLine
-                {
-                    QuickBooksLineId = line.Id,
-                    LineNum = line.LineNum ?? 0,
-                    Description = line.Description ?? "",
-                    Amount = line.Amount,
-                    DetailType = line.DetailType ?? "",
-                    AccountId = line.AccountBasedExpenseLineDetail?.AccountRef?.Value ?? "",
-                    CustomerId = int.TryParse(line.AccountBasedExpenseLineDetail?.CustomerRef?.Value, out int customerId) ? customerId : 0,
-                    BillableStatus = line.ItemBasedExpenseLineDetail?.BillableStatus ?? "",
-                    ItemId = line.ItemBasedExpenseLineDetail?.ItemRef?.Value ?? "",
-                    Qty = line.ItemBasedExpenseLineDetail?.Qty ?? 0,
-                    UnitPrice = line.ItemBasedExpenseLineDetail?.UnitPrice ?? 0
-                });
-            }
+        //public async Task<ApiResponse<string>> CreateBillAsync(QuickBooksBillCreateDto billDto, string token, string realmId)
+        //{
 
-            return billLines;
-        }
+        //    var payload = new
+        //    {
+        //        VendorRef = new { value = billDto.VendorRef.Value },
+        //        APAccountRef = new { value = billDto.APAccountRef.Value },
+        //        TxnDate = billDto.TxnDate,
+        //        DueDate = billDto.DueDate,
+        //        PrivateNote = billDto.PrivateNote,
+        //        Line = billDto.Line.Select(line => new
+        //        {
+        //            Amount = line.Amount,
+        //            DetailType = line.DetailType,
+        //            Description = line.Description,
+        //            AccountBasedExpenseLineDetail = line.AccountBasedExpenseLineDetail != null ? new
+        //            {
+        //                AccountRef = new { value = line.AccountBasedExpenseLineDetail.AccountRef.Value },
+        //                CustomerRef = line.AccountBasedExpenseLineDetail.CustomerRef != null ? new { value = line.AccountBasedExpenseLineDetail.CustomerRef.Value } : null
+        //            } : null,
+        //            ItemBasedExpenseLineDetail = line.ItemBasedExpenseLineDetail != null ? new
+        //            {
+        //                ItemRef = new { value = line.ItemBasedExpenseLineDetail.ItemRef.Value },
+        //                Qty = line.ItemBasedExpenseLineDetail.Qty,
+        //                UnitPrice = line.ItemBasedExpenseLineDetail.UnitPrice,
+        //                CustomerRef = line.ItemBasedExpenseLineDetail.CustomerRef != null ? new { value = line.ItemBasedExpenseLineDetail.CustomerRef.Value } : null,
+        //                BillableStatus = line.ItemBasedExpenseLineDetail.BillableStatus
+        //            } : null
+        //        }).ToList(),
+        //        TotalAmt = billDto.TotalAmt,
+        //        CurrencyRef = new { value = billDto.CurrencyRef.Value }
+        //    };
+
+
+        //    var json = JsonConvert.SerializeObject(payload);
+
+        //    var client = _httpClientFactory.CreateClient();
+        //    var qburl = _configuration["QuickBookBaseUrl"];
+        //    var request = new HttpRequestMessage(HttpMethod.Post, $"{qburl}{realmId}/bill?minorversion=65")
+        //    {
+        //        Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
+        //    };
+        //    request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        //    request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        //    var response = await client.SendAsync(request);
+
+        //    if (!response.IsSuccessStatusCode)
+        //    {
+        //        var error = await response.Content.ReadAsStringAsync();
+        //        return new ApiResponse<string>
+        //        {
+        //            Message = "Failed to create bill in QuickBooks.",
+        //            Error=error
+        //        };
+        //    }
+
+        //    var content = await response.Content.ReadAsStringAsync();
+        //    var jsonResponse = JObject.Parse(content);
+        //    var qbBill = jsonResponse["Bill"]?.ToObject<QuickBooksBillDto>();
+
+        //    if (qbBill == null)
+        //    {
+        //        return new ApiResponse<string>
+        //        {
+        //            Message = "QuickBooks returned an empty response.",
+        //            Data = content
+        //        };
+        //    }
+        //    var bill = new Bill
+        //    {
+        //        QuickBooksBillId = qbBill.Id,
+        //        SyncToken = qbBill.SyncToken,
+        //        TxnDate = qbBill.TxnDate,
+        //        DueDate = qbBill.DueDate,
+        //        TotalAmt = qbBill.TotalAmt,
+        //        Balance = qbBill.Balance,
+        //        PrivateNote = qbBill.PrivateNote,
+        //        CurrencyValue = qbBill.Currency?.Value,
+        //        CurrencyName = qbBill.Currency?.Name,
+        //        VendorId = qbBill.VendorRef?.Value,
+        //        APAccountId = qbBill.APAccountRef?.Value,
+        //        CreateTime = qbBill.MetaData?.CreateTime,
+        //        LastUpdatedTime = qbBill.MetaData?.LastUpdatedTime,
+        //        BillLines = new List<BillLine>()
+        //    };
+
+        //    foreach (var line in qbBill.Line ?? new List<QuickBooksLineDto>())
+        //    {
+        //        var billLine = new BillLine
+        //        {
+        //            QuickBooksLineId = line.Id,
+        //            LineNum = line.LineNum ?? 0,
+        //            Description = line.Description,
+        //            Amount = line.Amount,
+        //            DetailType = line.DetailType,
+        //            AccountId = line.AccountBasedExpenseLineDetail?.AccountRef?.Value,
+        //            CustomerId = int.TryParse(line.AccountBasedExpenseLineDetail?.CustomerRef?.Value, out var cid) ? cid : 0,
+        //            BillableStatus = line.ItemBasedExpenseLineDetail?.BillableStatus,
+        //            ItemId = line.ItemBasedExpenseLineDetail?.ItemRef?.Value,
+        //            Qty = line.ItemBasedExpenseLineDetail?.Qty,
+        //            UnitPrice = line.ItemBasedExpenseLineDetail?.UnitPrice
+        //        };
+
+        //        bill.BillLines.Add(billLine);
+        //    }
+        //    _context.Bills.Add(bill);
+        //    await _context.SaveChangesAsync();
+
+        //    return new ApiResponse<string>
+        //    {
+        //        Message = "Bill successfully created in QuickBooks and saved locally.",
+        //        Data = qbBill.Id,
+        //        Error=null
+        //    };
+        //}
+
+        //private Bill MapQuickBooksBillToEntity(QuickBooksBillDto qbBill)
+        //{
+        //    return new Bill
+        //    {
+        //        QuickBooksBillId = qbBill.Id,
+        //        SyncToken = qbBill.SyncToken ?? "",
+        //        TxnDate = qbBill.TxnDate ?? DateTime.MinValue,
+        //        DueDate = qbBill.DueDate ?? DateTime.MinValue,
+        //        TotalAmt = qbBill.TotalAmt,
+        //        Balance = qbBill.Balance,
+        //        PrivateNote = qbBill.PrivateNote ?? "",
+        //        CurrencyValue = qbBill.Currency?.Value ?? "",
+        //        CurrencyName = qbBill.Currency?.Name ?? "",
+        //        VendorId = qbBill.VendorRef?.Value ?? "",
+        //        APAccountId = qbBill.APAccountRef?.Value ?? "",
+        //        CreateTime = qbBill.MetaData?.CreateTime ?? DateTime.MinValue,
+        //        LastUpdatedTime = qbBill.MetaData?.LastUpdatedTime ?? DateTime.MinValue,
+        //        BillLines = MapBillLines(qbBill.Line)
+        //    };
+        //}
+
+        //private List<BillLine> MapBillLines(List<QuickBooksLineDto> lines)
+        //{
+        //    var billLines = new List<BillLine>();
+
+        //    foreach (var line in lines)
+        //    {
+        //        billLines.Add(new BillLine
+        //        {
+        //            QuickBooksLineId = line.Id,
+        //            LineNum = line.LineNum ?? 0,
+        //            Description = line.Description ?? "",
+        //            Amount = line.Amount,
+        //            DetailType = line.DetailType ?? "",
+        //            AccountId = line.AccountBasedExpenseLineDetail?.AccountRef?.Value ?? "",
+        //            CustomerId = int.TryParse(line.AccountBasedExpenseLineDetail?.CustomerRef?.Value, out int customerId) ? customerId : 0,
+        //            BillableStatus = line.ItemBasedExpenseLineDetail?.BillableStatus ?? "",
+        //            ItemId = line.ItemBasedExpenseLineDetail?.ItemRef?.Value ?? "",
+        //            Qty = line.ItemBasedExpenseLineDetail?.Qty ?? 0,
+        //            UnitPrice = line.ItemBasedExpenseLineDetail?.UnitPrice ?? 0
+        //        });
+        //    }
+
+        //    return billLines;
+        //}
 
     }
 }

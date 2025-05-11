@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
+﻿
 namespace SharedModels.Models
 {
     public class UnifiedInvoice
@@ -11,7 +6,7 @@ namespace SharedModels.Models
 
         public int Id { get; set; }
         public string ExternalId { get; set; }
-        public string InvoiceNumber { get; set; }
+        public string? InvoiceNumber { get; set; }
         public string? Reference { get; set; }
         public string? Status { get; set; }
         public string? CurrencyCode { get; set; }
@@ -31,10 +26,10 @@ namespace SharedModels.Models
         public string SourceSystem { get; set; }
     }
 
-    // Address Models for JSON serialization
+   
     public class InvoiceAddress
     {
-        public string Type { get; set; } // "BILLING" or "SHIPPING"
+        public string Type { get; set; }
         public string Line1 { get; set; }
         public string Line2 { get; set; }
         public string Line3 { get; set; }
@@ -43,8 +38,7 @@ namespace SharedModels.Models
         public string State { get; set; }
         public string PostalCode { get; set; }
         public string Country { get; set; }
-        public decimal? Latitude { get; set; }
-        public decimal? Longitude { get; set; }
+        
     }
 
     public class InvoiceLineItem
@@ -115,6 +109,33 @@ namespace SharedModels.Models
         public string PostalCode { get; set; }
         public string Country { get; set; }
         public string Type { get; set; }  // "Billing" or "Shipping"
+    }
+
+
+    public class InvoiceDto
+    {
+        public int Id { get; set; }
+        public string InvoiceId { get; set; }
+        public string InvoiceNumber { get; set; }
+        public string? Reference { get; set; }
+        public string? Status { get; set; }
+        public string? CurrencyCode { get; set; }
+        public DateTime InvoiceDate { get; set; }
+        public DateTime DueDate { get; set; }
+        public string CustomerId { get; set; }
+        public string? CustomerName { get; set; }
+        public string BillingAddress { get; set; }
+        public decimal Subtotal { get; set; }
+        public decimal TaxAmount { get; set; }
+        public decimal Total { get; set; }
+        public decimal AmountDue { get; set; }
+        public decimal? AmountPaid { get; set; }
+        public string? LineAmountTypes { get; set; }
+        public string SourceSystem { get; set; }
+        public bool SendLater { get; set; }
+        public DateTime CreatedAt { get; set; }
+        public DateTime? UpdatedAt { get; set; }
+        public List<InvoiceLineItem> LineItems { get; set; }
     }
 
 }

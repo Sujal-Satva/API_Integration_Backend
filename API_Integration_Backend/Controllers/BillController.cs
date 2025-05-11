@@ -1,11 +1,5 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using Newtonsoft.Json.Linq;
-using System;
-using System.Net.Http.Headers;
-using task_14.Data;
-using task_14.Models;
-using task_14.Repository;
+using SharedModels.Models;
 using task_14.Services;
 
 namespace task_14.Controllers
@@ -15,44 +9,52 @@ namespace task_14.Controllers
     public class BillsController : ControllerBase
     {
         private readonly IBillRepository _billRepository;
-        private readonly ITokenRespository _tokenRepository;
-        public BillsController( IBillRepository billRepository, ITokenRespository tokenRespository)
+        public BillsController( IBillRepository billRepository)
         {
             _billRepository = billRepository;
-            _tokenRepository = tokenRespository;
         }
-
-        [HttpGet("fetch")]
-        public async Task<ActionResult<ApiResponse<string>>> SyncBillsFromQuickBooks()
+        [HttpGet("fetch-qbo")]
+        public async Task<IActionResult> FetchBillsFromQuickBooks()
         {
             try
             {
-                var tokenResult = await _tokenRepository.GetTokenAsync();
-                if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
-                {
-                    return Unauthorized(new ApiResponse<string>(error: "TokenInvalid", message: "QuickBooks access token is invalid or expired."));
-                }
+                var response = await _billRepository.SyncBills("QuickBooks");
 
-                var result = await _billRepository.SyncBillsFromQuickBooksAsync(tokenResult.Token, tokenResult.RealmId);
-
-               
-                if (result.Error != null)
-                {
-                    return BadRequest(result); 
-                }
-
-                return Ok(result);
+                return StatusCode(response.Status, response);
             }
             catch (Exception ex)
             {
-                
-                return StatusCode(500, new ApiResponse<string>(
-                    error: ex.Message,
-                    message: "An unexpected error occurred while syncing bills from QuickBooks.",
-                    data: ex.StackTrace
-                ));
+                var errorResponse = new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
+                );
+
+                return StatusCode(500, errorResponse);
             }
         }
+
+        
+        [HttpGet("fetch-xero")]
+        public async Task<IActionResult> FetchBillsFromXero()
+        {
+            try
+            {
+                var response = await _billRepository.SyncBills("Xero");
+                return StatusCode(response.Status, response);
+            }
+            catch (Exception ex)
+            {
+                var errorResponse = new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
+                );
+
+                return StatusCode(500, errorResponse);
+            }
+        }
+
 
 
         [HttpGet]
@@ -60,52 +62,47 @@ namespace task_14.Controllers
            int page = 1,
            int pageSize = 10,
            string? search = null,
-           string? sortColumn = null,
-           string? sortDirection = "asc",
-           bool pagination = true)
+           string? sortColumn = "",
+           string? sortDirection = "desc",
+           bool pagination = true,
+           string sourceSystem="all")
         {
             var result = await _billRepository.GetBillsAsync(
-                page, pageSize, search, sortColumn, sortDirection, pagination
+                page, pageSize, search, sortColumn, sortDirection, pagination,
+                sourceSystem
             );
 
             return Ok(result);
         }
 
+
         [HttpPost("add")]
-        public async Task<IActionResult> CreateBill([FromBody] QuickBooksBillCreateDto billDto)
+        public async Task<IActionResult> AddBill([FromQuery] string platform, [FromBody] object input)
         {
             try
             {
-               
-                var tokenResult = await _tokenRepository.GetTokenAsync();
-                if (!tokenResult.Success || string.IsNullOrEmpty(tokenResult.Token) || string.IsNullOrEmpty(tokenResult.RealmId))
+                if (string.IsNullOrEmpty(platform))
+                    return BadRequest(new CommonResponse<object>(400, "Platform is required (xero or quickbooks)"));
+
+                var response = await _billRepository.AddBillsAsync(platform, input);
+
+                if (response.Status != 200)
                 {
-                    return Unauthorized(new ApiResponse<string>(
-                        error: "TokenInvalid",
-                        message: "QuickBooks access token is invalid or expired."
-                    ));
+                    return BadRequest(new CommonResponse<object>(response.Status, response.Message, response.Data));
                 }
 
-                var result = await _billRepository.CreateBillAsync(billDto, tokenResult.Token, tokenResult.RealmId);
-
-              
-                if (!string.IsNullOrEmpty(result.Error))
-                {
-                    return BadRequest(result);
-                }
-
-                return Ok(result);
+                return StatusCode(response.Status, response);
             }
             catch (Exception ex)
             {
-                
-                return StatusCode(500, new ApiResponse<string>(
-                    error: ex.Message,
-                    message: "An unexpected error occurred while creating the bill.",
-                    data: ex.StackTrace 
-                ));
+                var errorResponse = new CommonResponse<object>(
+                    500,
+                    "Internal server error",
+                    ex.Message
+                );
+
+                return StatusCode(500, errorResponse);
             }
         }
-
     }
 }

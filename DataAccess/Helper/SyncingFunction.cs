@@ -1,7 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
 using SharedModels.Models;
-
+using SharedModels.QuickBooks.Models;
 using task_14.Data;
 
 namespace DataAccess.Helper
@@ -92,7 +92,7 @@ namespace DataAccess.Helper
 
         public async Task<CommonResponse<object>> StoreUnifiedInvoicesAsync(List<UnifiedInvoice> invoices)
         {
-            if (invoices == null || !invoices.Any())
+                if (invoices == null || !invoices.Any())
             {
                 return new CommonResponse<object>(400, "Invoice list is null or empty", null);
             }
@@ -122,6 +122,78 @@ namespace DataAccess.Helper
             await _context.SaveChangesAsync();
             return new CommonResponse<object>(200, "Invoices upserted successfully", invoices);
         }
+
+
+        public async Task<CommonResponse<object>> StoreUnifiedBillsAsync(List<UnifiedBill> bills)
+        {
+            if (bills == null || !bills.Any())
+            {
+                return new CommonResponse<object>(400, "Bill list is null or empty", null);
+            }
+
+            var externalIds = bills.Select(b => b.ExternalId).ToList();
+            var sourceSystem = bills.First().SourceSystem;
+
+            var existingBills = await _context.UnifiedBills
+                .Where(b => externalIds.Contains(b.ExternalId) && b.SourceSystem == sourceSystem)
+                .ToListAsync();
+
+            
+            foreach (var bill in bills)
+            {
+                var existingBill = existingBills.FirstOrDefault(e => e.ExternalId == bill.ExternalId);
+
+                if (existingBill != null)
+                {
+                   
+                    bill.Id = existingBill.Id;
+                    _context.Entry(existingBill).CurrentValues.SetValues(bill);
+                }
+                else
+                {
+                   
+                    _context.UnifiedBills.Add(bill);
+                }
+            }
+            await _context.SaveChangesAsync();
+
+            return new CommonResponse<object>(200, "Bills upserted successfully", bills);
+        }
+
+        public async Task<CommonResponse<object>> StoreUnifiedVendorsAsync(List<UnifiedVendor> vendors)
+        {
+            if (vendors == null || !vendors.Any())
+            {
+                return new CommonResponse<object>(400, "Vendor list is null or empty", null);
+            }
+
+            var externalIds = vendors.Select(v => v.ExternalId).ToList();
+            var sourceSystem = vendors.First().SourceSystem;
+
+            var existingVendors = await _context.UnifiedVendors
+                .Where(v => externalIds.Contains(v.ExternalId) && v.SourceSystem == sourceSystem)
+                .ToListAsync();
+
+            foreach (var vendor in vendors)
+            {
+                var existing = existingVendors.FirstOrDefault(e => e.ExternalId == vendor.ExternalId);
+
+                if (existing != null)
+                {
+                    vendor.Id = existing.Id;
+                    _context.Entry(existing).CurrentValues.SetValues(vendor);
+                }
+                else
+                {
+                    _context.UnifiedVendors.Add(vendor);
+                }
+            }
+
+            await _context.SaveChangesAsync();
+            return new CommonResponse<object>(200, "Vendors upserted successfully", vendors);
+        }
+
+
 
         public async Task<CommonResponse<object>> MarkInvoiceAsDeletedAsync(string id, string status)
         {

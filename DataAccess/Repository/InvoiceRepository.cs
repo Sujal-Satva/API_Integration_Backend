@@ -1,12 +1,10 @@
 ﻿using CsvHelper;
 using DataAccess.Helper;
 using DataAccess.Services;
-using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using QuickBookService.Interfaces;
-using QuickBookService.Services;
 using SharedModels.Models;
 
 using task_14.Data;
@@ -20,18 +18,15 @@ namespace task_14.Repository
         {
 
         private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _configuration;
         private readonly SyncingFunction _syncingFunction;
-        private readonly IHttpClientFactory _httpClientFactory;
+
         private readonly IQuickBooksInvoiceServices _quickBooksInvoiceServices;
         private readonly IXeroInvoiceService _xeroInvoiceService;
         private readonly IConnectionRepository _connectionRepository;
 
-        public InvoiceRepository(ApplicationDbContext context, IHttpClientFactory httpClientFactory, SyncingFunction syncingFunction, IConfiguration configuration, IQuickBooksInvoiceServices quickBooksInvoiceServices, IConnectionRepository connectionRepository, IXeroInvoiceService xeroInvoiceService)
+        public InvoiceRepository(ApplicationDbContext context, SyncingFunction syncingFunction, IQuickBooksInvoiceServices quickBooksInvoiceServices, IConnectionRepository connectionRepository, IXeroInvoiceService xeroInvoiceService)
         {
             _context = context;
-            _httpClientFactory = httpClientFactory;
-            _configuration = configuration;
             _quickBooksInvoiceServices = quickBooksInvoiceServices;
             _connectionRepository = connectionRepository;
             _xeroInvoiceService = xeroInvoiceService;
@@ -46,18 +41,26 @@ namespace task_14.Repository
                 var connectionResult = await _connectionRepository.GetConnectionAsync(platform);
                 if (connectionResult.Status != 200 || connectionResult.Data == null)
                     return new CommonResponse<object>(connectionResult.Status, connectionResult.Message);
-                CommonResponse<object> response = null;
 
-                if (platform == "QuickBooks")
+                CommonResponse<object> response;
+
+                switch (platform.ToLower())
                 {
-                    response = await _quickBooksInvoiceServices.FetchInvoicesFromQuickBooks(connectionResult.Data);
+                    case "quickbooks":
+                        response = await _quickBooksInvoiceServices.FetchInvoicesFromQuickBooks(connectionResult.Data);
+                        break;
+
+                    case "xero":
+                        response = await _xeroInvoiceService.FetchInvoicesFromXero(connectionResult.Data);
+                        break;
+
+                    default:
+                        return new CommonResponse<object>(400, $"Unsupported platform: {platform}");
                 }
-                else
-                {
-                    response = await _xeroInvoiceService.FetchInvoicesFromXero(connectionResult.Data);
-                }
+
                 if (response.Data == null)
                     return new CommonResponse<object>(response.Status, response.Message);
+
                 var unifiedItems = response.Data as List<UnifiedInvoice>;
                 await _syncingFunction.UpdateSyncingInfo(connectionResult.Data.ExternalId, "Invoices", DateTime.UtcNow);
                 return await _syncingFunction.StoreUnifiedInvoicesAsync(unifiedItems);
@@ -67,6 +70,7 @@ namespace task_14.Repository
                 return new CommonResponse<object>(500, "Failed to insert items", ex.Message);
             }
         }
+
 
 
         public async Task<CommonResponse<object>> AddInvoicesAsync(string platform, object input)
@@ -155,8 +159,6 @@ namespace task_14.Repository
                 return new CommonResponse<object>(500, "An error occurred while adding the item", ex.Message);
             }
         }
-
-
         public async Task<CommonResponse<object>> DeleteInvoiceAsync(string platform, string id,string status)
         {
             try
@@ -205,10 +207,16 @@ namespace task_14.Repository
             string sortBy,
             string sortDirection,
             bool pagination =true,
-            string source = "all")
+            string source = "all",
+            bool isBill=false)
         {
             var query = _context.UnifiedInvoices.AsQueryable();
             query = query.Where(i => i.Status != "DELETED");
+            if (!isBill)
+            {
+                query = query.Where(i => !string.IsNullOrWhiteSpace(i.InvoiceNumber));
+            }
+            
 
             if (!string.IsNullOrWhiteSpace(source) && source.ToLower() != "all")
             {
@@ -515,17 +523,5 @@ namespace task_14.Repository
         //    }
         //}
 
-        //private async Task<dynamic> ExecuteQuickBooksQuery(string token, string realmId, string qbUrl, string query)
-        //{
-        //    string url = $"{qbUrl}{realmId}/query?query={Uri.EscapeDataString(query)}";
-
-        //    using var client = new HttpClient();
-        //    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        //    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-        //    var response = await client.GetAsync(url);
-        //    var json = await response.Content.ReadAsStringAsync();
-        //    return JsonConvert.DeserializeObject(json);
-        // }
     }
 }

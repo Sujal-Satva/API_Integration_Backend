@@ -41,15 +41,18 @@ namespace XeroService.Services
             {
                 DateTime lastSynced = GetLastSyncedDate(connection.SyncingInfo, "Invoices");
                 DateTime bufferedTime = lastSynced.ToUniversalTime().AddMinutes(-10);
-                string dateFilter = bufferedTime > new DateTime(2000, 1, 1)
-                    ? $"?where=UpdatedDateUTC>=DateTime({bufferedTime:yyyy, MM, dd, HH, mm, ss})"
-                    : string.Empty;
+                string baseFilter = $"";
+                if (bufferedTime > new DateTime(2000, 1, 1))
+                {
+                    baseFilter += $"UpdatedDateUTC>=DateTime({bufferedTime:yyyy, MM, dd, HH, mm, ss})";
+                }
                 int page = 1;
                 var allProducts = new List<XeroInvoice>();
 
                 while (true)
                 {
-                    var apiResponse = await _xeroApiService.XeroGetRequest($"/Invoices{dateFilter}&page={page}", connection);
+                    string url = $"/Invoices?page={page}&where={Uri.EscapeDataString(baseFilter)}";
+                    var apiResponse = await _xeroApiService.XeroGetRequest($"{url}", connection);
                     if (apiResponse.Status != 200 || apiResponse.Data == null)
                         return new CommonResponse<object>(apiResponse.Status, "Failed to fetch customers from Xero", apiResponse.Data);
                     var final = JsonConvert.DeserializeObject<XeroInvoiceResponse>(apiResponse.Data.ToString());
